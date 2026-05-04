@@ -252,6 +252,11 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         alarmTimer?.cancel()
         alarmTimer = nil
         audioPlayer?.stop()
+        
+        // 倒數結束後釋放音訊資源
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
     private func playDeviceAlert() {
