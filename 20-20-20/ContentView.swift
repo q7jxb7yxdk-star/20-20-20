@@ -72,7 +72,7 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     
     // UI 觀察屬性
     @Published var currentStep: TimerStep = .work1      // 當前階段
-    @Published var timeRemaining: Int = TimerStep.work1.seconds // 剩餘時間
+    @Published var timeRemaining: Double = Double(TimerStep.work1.seconds) // 剩餘時間 (改為 Double 以支持順滑更新)
     @Published var isRunning = false                    // 是否正在計時
     @Published var isAlarming = false                   // 是否正在鬧鈴中
     
@@ -102,13 +102,10 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     }
 
     /// 配置音訊會話 (Audio Session)
-    /// 💡 優化：使用 .mixWithOthers 避免受系統通知音量增益強行拉大 App 聲音
     private func configureAudioSession() {
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         do {
-            // 使用 .playback 確保靜音模式仍有聲音
-            // 透過 .mixWithOthers 與系統層級通知聲音解耦，保持音量穩定
             try session.setCategory(.playback,
                                     mode: .default,
                                     options: [.mixWithOthers])
@@ -130,7 +127,7 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.prepareToPlay()
             audioPlayer?.numberOfLoops = 0
-            audioPlayer?.volume = 1.0 // 強制設定 App 內部播放音量
+            audioPlayer?.volume = 1.0
         } catch {
             print("無法初始化音樂播放器: \(error.localizedDescription)")
         }
@@ -138,9 +135,10 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     
     // MARK: - 計時邏輯區
     
-    /// 設定每秒更新兩次畫面的計時器
+    /// 設定高頻率更新計時器 (每 0.05 秒更新一次)
+    /// 💡 優化：提高更新頻率讓圓環縮減更順滑
     private func setupDisplayTimer() {
-        displayTimer = Timer.publish(every: 0.5, on: .main, in: .common)
+        displayTimer = Timer.publish(every: 0.05, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in self?.syncRemainingTime() }
     }
@@ -148,9 +146,10 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     /// 同步計算剩餘時間 (精準計算法)
     private func syncRemainingTime() {
         guard isRunning, let target = targetDate else { return }
-        let diff = Int(ceil(target.timeIntervalSinceNow))
+        let diff = target.timeIntervalSinceNow
+        
         if diff > 0 {
-            if self.timeRemaining != diff { self.timeRemaining = diff }
+            self.timeRemaining = diff
         } else {
             triggerAlarm()
         }
@@ -159,7 +158,6 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     /// 監聽系統生命週期
     private func setupLifecycleObservers() {
         #if os(iOS)
-        // 當 App 從背景回到前景時，主動同步時間
         NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
             .sink { [weak self] _ in
                 self?.syncRemainingTime()
@@ -170,39 +168,34 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
 
     // MARK: - 用戶動作處理
     
-    /// 切換 開始/暫停
     func toggle() {
         if isRunning { pause() } else { start() }
         triggerHaptic()
     }
 
-    /// 開始計時
     func start() {
-        targetDate = Date().addingTimeInterval(Double(timeRemaining))
+        targetDate = Date().addingTimeInterval(timeRemaining)
         isRunning = true
         isAlarming = false
         stopAlarmLoop()
         scheduleLocalNotification()
     }
 
-    /// 暫停計時
     func pause() {
         isRunning = false
         targetDate = nil
         cancelNotifications()
     }
 
-    /// 重設計時器
     func reset() {
         pause()
         stopAlarmLoop()
         isAlarming = false
         currentStep = .work1
-        timeRemaining = TimerStep.work1.seconds
+        timeRemaining = Double(currentStep.seconds)
         triggerHaptic()
     }
 
-    /// 觸發鬧鈴狀態
     func triggerAlarm() {
         guard !isAlarming else { return }
         isRunning = false
@@ -212,7 +205,6 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         startAlarmLoop()
     }
 
-    /// 進入下一個階段
     func nextStep() {
         let isLastStep = currentStep == .longRest
         stopAlarmLoop()
@@ -221,9 +213,8 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         let allSteps = TimerStep.allCases
         let nextIndex = (currentStep.rawValue + 1) % allSteps.count
         currentStep = allSteps[nextIndex]
-        timeRemaining = currentStep.seconds
+        timeRemaining = Double(currentStep.seconds)
         
-        // 如果不是最後一階段，則自動開始下一階段計時
         if !isLastStep {
             start()
         } else {
@@ -234,28 +225,22 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
 
     // MARK: - 通知與音效系統
     
-    /// 排程本地推播通知
     private func scheduleLocalNotification() {
         cancelNotifications()
         let content = UNMutableNotificationContent()
         content.title = "時間到！"
         content.body = "「\(currentStep.name)」已完成，請按下按鈕開始下一階段。"
-        
-        // 💡 關鍵修正：將通知聲音設為 nil。
-        // 避免系統通知音效觸發時，強行拉高全域增益導致 App 音樂爆音。
         content.sound = nil
         
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, Double(timeRemaining)), repeats: false)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, timeRemaining), repeats: false)
         let request = UNNotificationRequest(identifier: "202020Notification", content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request)
     }
 
-    /// 取消所有待發通知
     private func cancelNotifications() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
-    /// 開始鬧鈴循環播放 (每 3 秒播一次)
     private func startAlarmLoop() {
         playDeviceAlert()
         alarmTimer = Timer.publish(every: 3.0, on: .main, in: .common)
@@ -263,46 +248,28 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             .sink { [weak self] _ in self?.playDeviceAlert() }
     }
 
-    /// 停止鬧鈴播放
     private func stopAlarmLoop() {
         alarmTimer?.cancel()
         alarmTimer = nil
         audioPlayer?.stop()
     }
 
-    /// 執行裝置提醒 (音樂 + 震動/Beep)
     private func playDeviceAlert() {
-        var playedCustomSound = false
-        
         #if os(iOS)
-        // 播放前確保音訊會話處於活躍狀態
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif
         
-        // 1. 嘗試播放自訂音樂
         if let player = audioPlayer {
             player.volume = 1.0
             player.currentTime = 0
             player.play()
-            playedCustomSound = true
         }
         
-        // 2. 如果自訂音樂播放失敗，才執行系統預設提示音
-        if !playedCustomSound {
-            #if os(iOS)
-            AudioServicesPlaySystemSound(1005)
-            #elseif os(macOS)
-            NSSound.beep()
-            #endif
-        }
-        
-        // 3. 執行 iOS 觸覺/震動回饋
         #if os(iOS)
         AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
         #endif
     }
 
-    /// 點擊按鈕時的輕微觸覺回饋
     private func triggerHaptic() {
         #if os(iOS)
         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -311,15 +278,13 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         #endif
     }
 
-    /// 請求通知權限
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
     
-    /// 處理 App 在前台時收到通知的行為
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         triggerAlarm()
-        completionHandler([.banner, .list]) // 前台也會顯示橫幅
+        completionHandler([.banner, .list])
     }
 }
 
@@ -343,7 +308,7 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         #if os(macOS)
-        .frame(minWidth: 400, minHeight: 600) // Mac 版最小視窗限制
+        .frame(minWidth: 400, minHeight: 600)
         #endif
         .onAppear { manager.setupOnLaunch() }
     }
@@ -352,7 +317,6 @@ struct ContentView: View {
 // MARK: - 4. 介面組件詳解
 extension ContentView {
     
-    /// 頂部狀態標題
     private var statusHeader: some View {
         VStack(spacing: 12) {
             Text("20-20-20 護眼助理")
@@ -371,40 +335,37 @@ extension ContentView {
     }
     
     /// 中央進度圓環
+    /// 💡 優化：使用 .linear 動畫與高頻率數據同步，讓圓環縮減變得絲滑
     private var progressCircle: some View {
         ZStack {
-            // 背景底環
             Circle()
                 .stroke(Color.gray.opacity(0.1), lineWidth: 15)
             
-            // 動態進度條
             Circle()
-                .trim(from: 0, to: CGFloat(manager.timeRemaining) / CGFloat(manager.currentStep.seconds))
+                .trim(from: 0, to: manager.timeRemaining / Double(manager.currentStep.seconds))
                 .stroke(
                     manager.isAlarming ? Color.red : manager.currentStep.themeColor,
                     style: StrokeStyle(lineWidth: 15, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .animation(.easeInOut(duration: 0.5), value: manager.timeRemaining)
+                // 💡 使用線性動畫處理進度變化，消除頓挫感
+                .animation(.linear(duration: 0.05), value: manager.timeRemaining)
             
-            // 內部資訊 (圖示與倒數)
             VStack(spacing: 10) {
                 Image(systemName: manager.currentStep.icon)
                     .font(.largeTitle)
                     .foregroundColor(manager.isAlarming ? .red : manager.currentStep.themeColor)
                 
-                Text(timeString(from: manager.timeRemaining))
+                // 數字部分依然顯示整數秒，保持簡潔
+                Text(timeString(from: Int(ceil(manager.timeRemaining))))
                     .font(.system(size: 55, weight: .bold, design: .monospaced))
-                    .contentTransition(.numericText()) // 數字變動平滑動畫
             }
         }
         .frame(width: 250, height: 250)
     }
     
-    /// 控制按鈕群
     private var actionControls: some View {
         HStack(spacing: 40) {
-            // 主動作按鈕 (開始/暫停/確定完成)
             Button(action: {
                 if manager.isAlarming {
                     manager.nextStep()
@@ -427,7 +388,6 @@ extension ContentView {
             .scaleEffect(manager.isAlarming ? 1.15 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: manager.isAlarming)
             
-            // 重設按鈕
             Button(action: manager.reset) {
                 ZStack {
                     Circle()
@@ -443,7 +403,6 @@ extension ContentView {
         }
     }
     
-    /// 底部階段進度點
     private var stepDots: some View {
         HStack(spacing: 10) {
             ForEach(0..<TimerStep.allCases.count, id: \.self) { index in
@@ -454,8 +413,6 @@ extension ContentView {
             }
         }
     }
-    
-    // MARK: - 輔助計算屬性
     
     private var mainButtonIcon: String {
         if manager.isAlarming { return "checkmark" }
@@ -490,7 +447,7 @@ struct EyeCareTimerApp: App {
             ContentView()
         }
         #if os(macOS)
-        .windowStyle(.hiddenTitleBar) // 隱藏 Mac 標題列
+        .windowStyle(.hiddenTitleBar)
         #endif
     }
 }
