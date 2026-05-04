@@ -259,12 +259,21 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif
         
+        // 1. 播放自定義音效
         if let player = audioPlayer {
             player.volume = 1.0
             player.currentTime = 0
             player.play()
         }
         
+        // 2. macOS 專屬：若沒有播放器，則嗶一聲
+        #if os(macOS)
+        if audioPlayer == nil {
+            NSSound.beep()
+        }
+        #endif
+        
+        // 3. iOS 專屬：震動
         #if os(iOS)
         AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
         #endif
