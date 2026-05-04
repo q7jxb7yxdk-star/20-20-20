@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "20-20-20_AppIcon_1024px.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -68,6 +69,7 @@
       "size" : "256x256"
     },
     {
+      "filename" : "20-20-20_AppIcon_512px.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "512x512"
