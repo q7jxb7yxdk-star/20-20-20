@@ -241,7 +241,6 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     }
     
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        triggerAlarm()
         completionHandler([.banner, .list])
     }
 }
