@@ -102,7 +102,11 @@ class TimerManager: NSObject, ObservableObject {
     private var cancellables = Set<AnyCancellable>()    // 系統清理記憶體用
     
     // 音訊播放器物件
+    #if os(macOS)
+    private var alarmSound: NSSound?
+    #else
     private var audioPlayer: AVAudioPlayer?
+    #endif
     private let soundFileName = "alarm"                 // 預備播放的檔案名稱
     private let scheduledNotificationIdentifier = "202020Notification.scheduled"
     private let deliveredNotificationIdentifierPrefix = "202020Notification.alarm"
@@ -129,12 +133,19 @@ class TimerManager: NSObject, ObservableObject {
             print("找不到音效文件: \(soundFileName).caf")
             return
         }
+        #if os(macOS)
+        alarmSound = NSSound(contentsOf: url, byReference: false)
+        if alarmSound == nil {
+            print("音訊初始化失敗: 無法載入 \(soundFileName).caf")
+        }
+        #else
         do {
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.prepareToPlay()
         } catch {
             print("音訊初始化失敗: \(error)")
         }
+        #endif
     }
 
     #if os(iOS)
@@ -215,7 +226,7 @@ class TimerManager: NSObject, ObservableObject {
     func reset() {
         pause()
         isAlarming = false
-        audioPlayer?.stop()
+        stopAlarmSound()
         currentStep = .work1
         timeRemaining = Double(currentStep.seconds)
         triggerHaptic()
@@ -248,7 +259,7 @@ class TimerManager: NSObject, ObservableObject {
     func nextStep() {
         let isLastStep = currentStep == .longRest
         isAlarming = false
-        audioPlayer?.stop()
+        stopAlarmSound()
         
         let allSteps = TimerStep.allCases
         let nextIndex = (currentStep.rawValue + 1) % allSteps.count
@@ -265,12 +276,24 @@ class TimerManager: NSObject, ObservableObject {
 
     // 播放提醒聲
     private func playAlarmSound() {
-        #if os(iOS)
+        #if os(macOS)
+        alarmSound?.stop()
+        alarmSound?.volume = 1
+        alarmSound?.play()
+        #else
         try? AVAudioSession.sharedInstance().setActive(true)
-        #endif
         audioPlayer?.currentTime = 0
         audioPlayer?.volume = 1
         audioPlayer?.play()
+        #endif
+    }
+    
+    private func stopAlarmSound() {
+        #if os(macOS)
+        alarmSound?.stop()
+        #else
+        audioPlayer?.stop()
+        #endif
     }
 
     // 判斷 App 是否在前景，避免 macOS 目標編譯到 iOS 專用的 UIApplication
@@ -345,7 +368,7 @@ class TimerManager: NSObject, ObservableObject {
         }
         
         #if os(macOS)
-        // macOS 的提示音由 AVAudioPlayer 播放，通知本身保持安靜，避免雙重聲音。
+        // macOS 的提示音由 App 內播放，通知本身保持安靜，避免雙重聲音。
         content.sound = nil
         #else
         if let soundURL = Bundle.main.url(forResource: soundFileName, withExtension: "caf") {
