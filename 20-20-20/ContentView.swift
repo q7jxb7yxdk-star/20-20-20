@@ -64,7 +64,32 @@ enum TimerStep: Int, CaseIterable {
 }
 
 // MARK: - 2. 核心大腦 (處理計時邏輯、音效與通知)
-class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
+final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationPresenter()
+    
+    private override init() {
+        super.init()
+    }
+    
+    // 設定當 App 開啟時，通知彈窗也能在螢幕頂部顯示
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        #if os(macOS)
+        let presentationOptions = UNNotificationPresentationOptions(rawValue: 4 | 8 | 16)
+        print("前景通知準備顯示: \(notification.request.identifier), options: \(presentationOptions.rawValue)")
+        completionHandler(presentationOptions)
+        #else
+        print("前景通知準備顯示: \(notification.request.identifier)")
+        if #available(iOS 14.0, macOS 11.0, *) {
+            // iOS 前景時由 AVAudioPlayer 播自訂聲音，通知只顯示畫面，避免聲音重疊。
+            completionHandler([.banner, .list])
+        } else {
+            completionHandler([.alert])
+        }
+        #endif
+    }
+}
+
+class TimerManager: NSObject, ObservableObject {
     
     // 被標註為 @Published 的變數，一旦改變，畫面就會跟著重新繪製
     @Published var currentStep: TimerStep = .work1      // 當前階段
@@ -79,11 +104,12 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     // 音訊播放器物件
     private var audioPlayer: AVAudioPlayer?
     private let soundFileName = "alarm"                 // 預備播放的檔案名稱
-    private let notificationIdentifier = "202020Notification"
+    private let scheduledNotificationIdentifier = "202020Notification.scheduled"
+    private let deliveredNotificationIdentifierPrefix = "202020Notification.alarm"
     
     override init() {
         super.init()
-        UNUserNotificationCenter.current().delegate = self // 讓這個類別處理通知彈窗
+        UNUserNotificationCenter.current().delegate = NotificationPresenter.shared // 讓常駐物件處理通知彈窗
         setupDisplayTimer()       // 啟動 0.05 秒一次的畫面更新機制
         setupLifecycleObservers() // 監聽 App 進入背景或回到前台
         prepareAudio()            // 預先載入鈴聲檔案
@@ -171,7 +197,11 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         targetDate = Date().addingTimeInterval(timeRemaining)
         isRunning = true
         isAlarming = false
+        #if os(macOS)
+        cancelNotifications()
+        #else
         scheduleLocalNotification()
+        #endif
     }
 
     // 暫停計時
@@ -199,18 +229,16 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         timeRemaining = 0
         targetDate = nil
         
-        // macOS 在背景仍可播放 App 內音效；iOS 背景則交給系統通知音效。
+        // macOS 不論 App 是否在前景，都明確送出通知；自訂聲音由 App 內播放。
         #if os(macOS)
         playAlarmSound()
-        if !isAppActive {
-            deliverAlarmNotificationImmediately()
-        }
+        deliverAlarmNotificationImmediately()
         #else
-        // 前景用 AVAudioPlayer；背景用 notification sound。不要同時播兩個。
+        // iOS 在開始倒數時已預約系統通知，歸零時只處理 App 內狀態，避免背景時補送第二則。
         if isAppActive {
             playAlarmSound()   // 前景才播
         } else {
-            deliverAlarmNotificationImmediately()
+            print("iOS 背景通知已由預排通知處理，略過補送")
         }
         #endif
         triggerHaptic()  // 讓機器震動
@@ -261,13 +289,17 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     // 預約一則在未來的通知（當倒計時歸零時由系統顯示）
     private func scheduleLocalNotification() {
         cancelNotifications()
+        logNotificationSettings(context: "排程倒數通知前")
+        
         let content = makeAlarmNotificationContent()
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, timeRemaining), repeats: false)
-        let request = UNNotificationRequest(identifier: notificationIdentifier, content: content, trigger: trigger)
+        let request = UNNotificationRequest(identifier: scheduledNotificationIdentifier, content: content, trigger: trigger)
         
         UNUserNotificationCenter.current().add(request) { error in
             if let error {
                 print("通知排程失敗: \(error)")
+            } else {
+                print("通知已排程: \(self.scheduledNotificationIdentifier)")
             }
         }
     }
@@ -275,21 +307,35 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     // 當 macOS App 在背景仍然活著並自行倒數到零時，補發一則立即通知
     private func deliverAlarmNotificationImmediately() {
         let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: [notificationIdentifier])
+        center.delegate = NotificationPresenter.shared
+        center.removePendingNotificationRequests(withIdentifiers: [scheduledNotificationIdentifier])
+        logNotificationSettings(context: "立即送出通知前")
+        let identifier = "\(deliveredNotificationIdentifierPrefix).\(UUID().uuidString)"
+        
+        #if os(macOS)
+        let trigger: UNNotificationTrigger? = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        #else
+        let trigger: UNNotificationTrigger? = nil
+        #endif
         
         let request = UNNotificationRequest(
-            identifier: notificationIdentifier,
+            identifier: identifier,
             content: makeAlarmNotificationContent(),
-            trigger: nil
+            trigger: trigger
         )
         
         center.add(request) { error in
             if let error {
                 print("立即通知發送失敗: \(error)")
+            } else {
+                #if os(macOS)
+                print("macOS 原生通知已排程: \(request.identifier)")
+                #else
+                print("立即通知已加入: \(request.identifier)")
+                #endif
             }
         }
     }
-
     private func makeAlarmNotificationContent() -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         content.title = "時間到！"
@@ -299,7 +345,8 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         }
         
         #if os(macOS)
-        content.sound = .default
+        // macOS 的提示音由 AVAudioPlayer 播放，通知本身保持安靜，避免雙重聲音。
+        content.sound = nil
         #else
         if let soundURL = Bundle.main.url(forResource: soundFileName, withExtension: "caf") {
             content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: soundURL.lastPathComponent))
@@ -310,11 +357,37 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         
         return content
     }
+    
+    private func logNotificationSettings(context: String) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let baseMessage = "\(context) - authorization: \(settings.authorizationStatus.rawValue), alerts: \(settings.alertSetting.rawValue), sounds: \(settings.soundSetting.rawValue), notificationCenter: \(settings.notificationCenterSetting.rawValue)"
+            
+            #if os(macOS)
+            if #available(iOS 15.0, macOS 12.0, *) {
+                print("\(baseMessage), alertStyle: \(settings.alertStyle.rawValue), timeSensitive: \(settings.timeSensitiveSetting.rawValue)")
+            } else {
+                print("\(baseMessage), alertStyle: \(settings.alertStyle.rawValue)")
+            }
+            #else
+            print(baseMessage)
+            #endif
+        }
+    }
 
     // 清除所有排隊中或已顯示的通知
     private func cancelNotifications() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [notificationIdentifier])
-        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [notificationIdentifier])
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [scheduledNotificationIdentifier])
+        center.removeDeliveredNotifications(withIdentifiers: [scheduledNotificationIdentifier])
+        center.getDeliveredNotifications { [deliveredNotificationIdentifierPrefix] notifications in
+            let ids = notifications
+                .map(\.request.identifier)
+                .filter { $0.hasPrefix(deliveredNotificationIdentifierPrefix) }
+            
+            if !ids.isEmpty {
+                center.removeDeliveredNotifications(withIdentifiers: ids)
+            }
+        }
     }
 
     // 根據裝置發出不同的物理震動反饋
@@ -345,11 +418,6 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                 }
             }
         }
-    }
-    
-    // 設定當 App 開啟時，通知彈窗也能在螢幕頂部顯示
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .list, .sound])
     }
 }
 
@@ -547,6 +615,10 @@ extension ContentView {
 // MARK: - 4. App 入口 (整個程式的出發點)
 @main
 struct EyeCareTimerApp: App {
+    init() {
+        UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView() // 啟動畫面
