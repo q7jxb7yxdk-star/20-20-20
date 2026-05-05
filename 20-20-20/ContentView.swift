@@ -135,9 +135,9 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         let diff = target.timeIntervalSinceNow // 計算秒數差
         
         if diff > 0 {
-            self.timeRemaining = diff // 更新剩餘時間
-        } else {
-            triggerAlarm()            // 歸零，觸發鬧鐘
+            timeRemaining = diff // 更新剩餘時間
+        } else if isRunning {
+            triggerAlarm() // 歸零，觸發鬧鐘
         }
     }
 
@@ -272,7 +272,7 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     
     // 設定當 App 開啟時，通知彈窗也能在螢幕頂部顯示
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .list, .sound])
+        completionHandler([.banner, .list])
     }
 }
 
