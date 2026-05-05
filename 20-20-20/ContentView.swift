@@ -446,7 +446,7 @@ class TimerManager: NSObject, ObservableObject {
                     schedule: .fixed(fireDate),
                     attributes: attributes,
                     stopIntent: StopEyeCareAlarmIntent(alarmID: id),
-                    sound: .default
+                    sound: .named("alarm.caf")
                 )
             )
             await MainActor.run {
