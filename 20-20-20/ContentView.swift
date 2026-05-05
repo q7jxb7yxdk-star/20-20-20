@@ -79,6 +79,7 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     // 音訊播放器物件
     private var audioPlayer: AVAudioPlayer?
     private let soundFileName = "alarm"                 // 預備播放的檔案名稱
+    private let notificationIdentifier = "202020Notification"
     
     override init() {
         super.init()
@@ -198,10 +199,20 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         timeRemaining = 0
         targetDate = nil
         
-        // 前景用 AVAudioPlayer；背景用 notification sound。不要同時播兩個。
-        if UIApplication.shared.applicationState == .active {
-            playAlarmSound()   // 前景才播
+        // macOS 在背景仍可播放 App 內音效；iOS 背景則交給系統通知音效。
+        #if os(macOS)
+        playAlarmSound()
+        if !isAppActive {
+            deliverAlarmNotificationImmediately()
         }
+        #else
+        // 前景用 AVAudioPlayer；背景用 notification sound。不要同時播兩個。
+        if isAppActive {
+            playAlarmSound()   // 前景才播
+        } else {
+            deliverAlarmNotificationImmediately()
+        }
+        #endif
         triggerHaptic()  // 讓機器震動
     }
 
@@ -230,7 +241,19 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif
         audioPlayer?.currentTime = 0
+        audioPlayer?.volume = 1
         audioPlayer?.play()
+    }
+
+    // 判斷 App 是否在前景，避免 macOS 目標編譯到 iOS 專用的 UIApplication
+    private var isAppActive: Bool {
+        #if os(iOS)
+        return UIApplication.shared.applicationState == .active
+        #elseif os(macOS)
+        return NSApplication.shared.isActive
+        #else
+        return true
+        #endif
     }
 
     // MARK: - 通知系統
@@ -238,25 +261,60 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     // 預約一則在未來的通知（當倒計時歸零時由系統顯示）
     private func scheduleLocalNotification() {
         cancelNotifications()
+        let content = makeAlarmNotificationContent()
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, timeRemaining), repeats: false)
+        let request = UNNotificationRequest(identifier: notificationIdentifier, content: content, trigger: trigger)
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                print("通知排程失敗: \(error)")
+            }
+        }
+    }
+
+    // 當 macOS App 在背景仍然活著並自行倒數到零時，補發一則立即通知
+    private func deliverAlarmNotificationImmediately() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [notificationIdentifier])
+        
+        let request = UNNotificationRequest(
+            identifier: notificationIdentifier,
+            content: makeAlarmNotificationContent(),
+            trigger: nil
+        )
+        
+        center.add(request) { error in
+            if let error {
+                print("立即通知發送失敗: \(error)")
+            }
+        }
+    }
+
+    private func makeAlarmNotificationContent() -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         content.title = "時間到！"
         content.body = "「\(currentStep.name)」已完成，請開始下一階段。"
+        if #available(iOS 15.0, macOS 12.0, *) {
+            content.interruptionLevel = .timeSensitive
+        }
+        
+        #if os(macOS)
+        content.sound = .default
+        #else
         if let soundURL = Bundle.main.url(forResource: soundFileName, withExtension: "caf") {
             content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: soundURL.lastPathComponent))
         } else {
             content.sound = .default
         }
+        #endif
         
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, timeRemaining), repeats: false)
-        let request = UNNotificationRequest(identifier: "202020Notification", content: content, trigger: trigger)
-        
-        UNUserNotificationCenter.current().add(request)
+        return content
     }
 
     // 清除所有排隊中或已顯示的通知
     private func cancelNotifications() {
-        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
-        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [notificationIdentifier])
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [notificationIdentifier])
     }
 
     // 根據裝置發出不同的物理震動反饋
@@ -272,12 +330,26 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
 
     // 詢問用戶是否給予發送通知的權限
     private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .notDetermined else {
+                print("通知權限狀態: \(settings.authorizationStatus.rawValue)")
+                return
+            }
+            
+            center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+                if let error {
+                    print("通知權限請求失敗: \(error)")
+                } else {
+                    print("通知權限請求結果: \(granted)")
+                }
+            }
+        }
     }
     
     // 設定當 App 開啟時，通知彈窗也能在螢幕頂部顯示
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .list])
+        completionHandler([.banner, .list, .sound])
     }
 }
 
@@ -302,10 +374,42 @@ struct ContentView: View {
         }
         #if os(macOS)
         .frame(minWidth: 400, minHeight: 600) // Mac 版視窗大小
+        .background(WindowInitialSizeConfigurator(width: 400, height: 600))
         #endif
         .onAppear { manager.setupOnLaunch() } // 畫面加載完成後進行權限請求
     }
 }
+
+#if os(macOS)
+struct WindowInitialSizeConfigurator: NSViewRepresentable {
+    let width: CGFloat
+    let height: CGFloat
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    func makeNSView(context: Context) -> NSView {
+        NSView()
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard !context.coordinator.didConfigure else { return }
+        context.coordinator.didConfigure = true
+        
+        DispatchQueue.main.async {
+            guard let window = nsView.window else { return }
+            let size = NSSize(width: width, height: height)
+            window.minSize = size
+            window.setContentSize(size)
+        }
+    }
+    
+    class Coordinator {
+        var didConfigure = false
+    }
+}
+#endif
 
 extension ContentView {
     
