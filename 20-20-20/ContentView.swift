@@ -30,21 +30,11 @@ enum TimerStep: Int, CaseIterable {
     
     // 每個階段的持續時間（秒）
     var seconds: Int {
-        #if DEBUG
-        // 開發測試模式：縮短時間以便快速看到結果
         switch self {
-        case .work1, .work2: return 10
-        case .eyeCare: return 5
-        case .longRest: return 8
+        case .work1, .work2: return AppConfiguration.duration.work
+        case .eyeCare: return AppConfiguration.duration.eyeCare
+        case .longRest: return AppConfiguration.duration.longRest
         }
-        #else
-        // 正式模式：標準 20-20-20 護眼法則的時間
-        switch self {
-        case .work1, .work2: return 20 * 60 // 20 分鐘
-        case .eyeCare: return 20            // 20 秒
-        case .longRest: return 3 * 60       // 3 分鐘
-        }
-        #endif
     }
     
     // 每個階段顯示的圖示名稱
@@ -64,6 +54,31 @@ enum TimerStep: Int, CaseIterable {
         default: return .blue
         }
     }
+}
+
+enum AppConfiguration {
+    typealias DurationConfiguration = (work: Int, eyeCare: Int, longRest: Int)
+    
+    // 每個階段的持續時間設定（秒）
+    static let duration: DurationConfiguration = {
+        #if DEBUG
+        // 開發測試模式：縮短時間以便快速看到結果
+        return (work: 10, eyeCare: 5, longRest: 8)
+        #else
+        // 正式模式：標準 20-20-20 護眼法則的時間
+        return (work: 20 * 60, eyeCare: 20, longRest: 3 * 60)
+        #endif
+    }()
+    
+    #if os(iOS)
+    static var alarmKitSound: AlertConfiguration.AlertSound {
+        #if DEBUG
+        return .default
+        #else
+        return .named("alarm.caf")
+        #endif
+    }
+    #endif
 }
 
 // MARK: - AlarmKit 資料
@@ -446,7 +461,7 @@ class TimerManager: NSObject, ObservableObject {
                     schedule: .fixed(fireDate),
                     attributes: attributes,
                     stopIntent: StopEyeCareAlarmIntent(alarmID: id),
-                    sound: .named("alarm.caf")
+                    sound: AppConfiguration.alarmKitSound
                 )
             )
             await MainActor.run {
