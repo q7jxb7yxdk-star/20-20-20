@@ -193,7 +193,10 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         timeRemaining = 0
         targetDate = nil
         
-        playAlarmSound() // 播放音效
+        // 前景用 AVAudioPlayer；背景用 notification sound。不要同時播兩個。
+        if UIApplication.shared.applicationState == .active {
+            playAlarmSound()   // 前景才播
+        }
         triggerHaptic()  // 讓機器震動
     }
 
@@ -269,7 +272,7 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     
     // 設定當 App 開啟時，通知彈窗也能在螢幕頂部顯示
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .list])
+        completionHandler([.banner, .list, .sound])
     }
 }
 
