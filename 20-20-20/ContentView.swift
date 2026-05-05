@@ -115,7 +115,12 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playback, mode: .default, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+            try session.setCategory(
+                .playback,
+                mode: .default,
+                options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers]
+            )
+            try session.setActive(true)
         } catch {
             print("Audio Session 配置失敗: \(error)")
         }
