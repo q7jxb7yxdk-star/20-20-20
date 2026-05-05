@@ -18,7 +18,7 @@ enum TimerStep: Int, CaseIterable {
     // 每個階段在介面上顯示的中文名稱
     var name: String {
         switch self {
-        case .work1: return "第一階段：專專注工作"
+        case .work1: return "第一階段：專注工作"
         case .eyeCare: return "第二階段：遠眺放鬆"
         case .work2: return "第三階段：專注工作"
         case .longRest: return "第四階段：深度休息"
@@ -233,7 +233,11 @@ class TimerManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         let content = UNMutableNotificationContent()
         content.title = "時間到！"
         content.body = "「\(currentStep.name)」已完成，請開始下一階段。"
-        content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: "\(soundFileName).caf"))
+        if let soundURL = Bundle.main.url(forResource: soundFileName, withExtension: "caf") {
+            content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: soundURL.lastPathComponent))
+        } else {
+            content.sound = .default
+        }
         
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, timeRemaining), repeats: false)
         let request = UNNotificationRequest(identifier: "202020Notification", content: content, trigger: trigger)
