@@ -75,10 +75,8 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         #if os(macOS)
         let presentationOptions = UNNotificationPresentationOptions(rawValue: 4 | 8 | 16)
-        print("前景通知準備顯示: \(notification.request.identifier), options: \(presentationOptions.rawValue)")
         completionHandler(presentationOptions)
         #else
-        print("前景通知準備顯示: \(notification.request.identifier)")
         if #available(iOS 14.0, macOS 11.0, *) {
             // iOS 前景時由 AVAudioPlayer 播自訂聲音，通知只顯示畫面，避免聲音重疊。
             completionHandler([.banner, .list])
@@ -106,29 +104,34 @@ class TimerManager: NSObject, ObservableObject {
     private var alarmSound: NSSound?
     #else
     private var audioPlayer: AVAudioPlayer?
+    private var isAudioSessionConfigured = false
     #endif
     private let soundFileName = "alarm"                 // 預備播放的檔案名稱
     private let scheduledNotificationIdentifier = "202020Notification.scheduled"
     private let deliveredNotificationIdentifierPrefix = "202020Notification.alarm"
+    private let isVerboseLoggingEnabled = false
     
     override init() {
         super.init()
         UNUserNotificationCenter.current().delegate = NotificationPresenter.shared // 讓常駐物件處理通知彈窗
         setupDisplayTimer()       // 啟動 0.05 秒一次的畫面更新機制
         setupLifecycleObservers() // 監聽 App 進入背景或回到前台
+        #if os(macOS)
         prepareAudio()            // 預先載入鈴聲檔案
+        #endif
     }
     
     // App 開啟時的初始化設置
     func setupOnLaunch() {
         requestNotificationPermission() // 向用戶請求允許發送通知
-        #if os(iOS)
-        configureAudioSession()         // 設定 iOS 的聲音播放模式
-        #endif
     }
     
     // 預載音效檔案到記憶體
     private func prepareAudio() {
+        #if os(iOS)
+        guard audioPlayer == nil else { return }
+        #endif
+        
         guard let url = Bundle.main.url(forResource: soundFileName, withExtension: "caf") else {
             print("找不到音效文件: \(soundFileName).caf")
             return
@@ -151,6 +154,8 @@ class TimerManager: NSObject, ObservableObject {
     #if os(iOS)
     // 專為 iOS 設置：讓聲音在靜音模式下也能播放，或壓低背景音樂
     private func configureAudioSession() {
+        guard !isAudioSessionConfigured else { return }
+        
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(
@@ -159,6 +164,7 @@ class TimerManager: NSObject, ObservableObject {
                 options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers]
             )
             try session.setActive(true)
+            isAudioSessionConfigured = true
         } catch {
             print("Audio Session 配置失敗: \(error)")
         }
@@ -211,6 +217,8 @@ class TimerManager: NSObject, ObservableObject {
         #if os(macOS)
         cancelNotifications()
         #else
+        configureAudioSession()
+        prepareAudio()
         scheduleLocalNotification()
         #endif
     }
@@ -249,7 +257,7 @@ class TimerManager: NSObject, ObservableObject {
         if isAppActive {
             playAlarmSound()   // 前景才播
         } else {
-            print("iOS 背景通知已由預排通知處理，略過補送")
+            debugLog("iOS 背景通知已由預排通知處理，略過補送")
         }
         #endif
         triggerHaptic()  // 讓機器震動
@@ -281,7 +289,7 @@ class TimerManager: NSObject, ObservableObject {
         alarmSound?.volume = 1
         alarmSound?.play()
         #else
-        try? AVAudioSession.sharedInstance().setActive(true)
+        prepareAudio()
         audioPlayer?.currentTime = 0
         audioPlayer?.volume = 1
         audioPlayer?.play()
@@ -322,7 +330,7 @@ class TimerManager: NSObject, ObservableObject {
             if let error {
                 print("通知排程失敗: \(error)")
             } else {
-                print("通知已排程: \(self.scheduledNotificationIdentifier)")
+                self.debugLog("通知已排程: \(self.scheduledNotificationIdentifier)")
             }
         }
     }
@@ -352,9 +360,9 @@ class TimerManager: NSObject, ObservableObject {
                 print("立即通知發送失敗: \(error)")
             } else {
                 #if os(macOS)
-                print("macOS 原生通知已排程: \(request.identifier)")
+                self.debugLog("macOS 原生通知已排程: \(request.identifier)")
                 #else
-                print("立即通知已加入: \(request.identifier)")
+                self.debugLog("立即通知已加入: \(request.identifier)")
                 #endif
             }
         }
@@ -387,12 +395,12 @@ class TimerManager: NSObject, ObservableObject {
             
             #if os(macOS)
             if #available(iOS 15.0, macOS 12.0, *) {
-                print("\(baseMessage), alertStyle: \(settings.alertStyle.rawValue), timeSensitive: \(settings.timeSensitiveSetting.rawValue)")
+                self.debugLog("\(baseMessage), alertStyle: \(settings.alertStyle.rawValue), timeSensitive: \(settings.timeSensitiveSetting.rawValue)")
             } else {
-                print("\(baseMessage), alertStyle: \(settings.alertStyle.rawValue)")
+                self.debugLog("\(baseMessage), alertStyle: \(settings.alertStyle.rawValue)")
             }
             #else
-            print(baseMessage)
+            self.debugLog(baseMessage)
             #endif
         }
     }
@@ -429,7 +437,7 @@ class TimerManager: NSObject, ObservableObject {
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { settings in
             guard settings.authorizationStatus == .notDetermined else {
-                print("通知權限狀態: \(settings.authorizationStatus.rawValue)")
+                self.debugLog("通知權限狀態: \(Self.authorizationStatusDescription(settings.authorizationStatus))")
                 return
             }
             
@@ -437,9 +445,25 @@ class TimerManager: NSObject, ObservableObject {
                 if let error {
                     print("通知權限請求失敗: \(error)")
                 } else {
-                    print("通知權限請求結果: \(granted)")
+                    self.debugLog("通知權限請求結果: \(granted)")
                 }
             }
+        }
+    }
+    
+    private func debugLog(_ message: String) {
+        guard isVerboseLoggingEnabled else { return }
+        print(message)
+    }
+    
+    private static func authorizationStatusDescription(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: return "notDetermined (0)"
+        case .denied: return "denied (1)"
+        case .authorized: return "authorized (2)"
+        case .provisional: return "provisional (3)"
+        case .ephemeral: return "ephemeral (4)"
+        @unknown default: return "unknown (\(status.rawValue))"
         }
     }
 }
