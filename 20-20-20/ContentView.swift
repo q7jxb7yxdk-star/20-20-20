@@ -5,6 +5,9 @@ import AVFoundation      // 負責：播放音效（控制鬧鐘鈴聲的播放�
 
 // 根據不同的作業系統，引入專屬的系統工具箱
 #if os(iOS)
+import AlarmKit          // 負責：使用系統級鬧鐘/計時器控制提醒
+import AppIntents        // 負責：提供 AlarmKit 按鈕觸發的系統意圖
+import ActivityKit       // 負責：AlarmKit 鬧鐘聲音等 Live Activity 相關型別
 import UIKit             // 負責：iOS 系統的底層工具（如螢幕震動、系統背景管理）
 #elseif os(macOS)
 import AppKit            // 負責：macOS 系統的底層工具（如電腦視窗管理、觸控板反饋）
@@ -63,6 +66,38 @@ enum TimerStep: Int, CaseIterable {
     }
 }
 
+// MARK: - AlarmKit 資料
+
+#if os(iOS)
+nonisolated struct EyeCareAlarmMetadata: AlarmMetadata {
+    let stepName: String
+}
+
+struct StopEyeCareAlarmIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "停止護眼提醒"
+    static var supportedModes: IntentModes = .background
+    
+    @Parameter(title: "Alarm ID")
+    var alarmID: String
+    
+    init() {
+        alarmID = ""
+    }
+    
+    init(alarmID: Alarm.ID) {
+        self.alarmID = alarmID.uuidString
+    }
+    
+    func perform() async throws -> some IntentResult {
+        if let id = UUID(uuidString: alarmID) {
+            try? AlarmManager.shared.stop(id: id)
+            try? AlarmManager.shared.cancel(id: id)
+        }
+        return .result()
+    }
+}
+#endif
+
 // MARK: - 2. 核心大腦 (處理計時邏輯、音效與通知)
 final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationPresenter()
@@ -111,11 +146,21 @@ class TimerManager: NSObject, ObservableObject {
     private let deliveredNotificationIdentifierPrefix = "202020Notification.alarm"
     private let isVerboseLoggingEnabled = false
     
+    #if os(iOS)
+    private let alarmManager = AlarmManager.shared
+    private var scheduledAlarmID: Alarm.ID?
+    private var alarmSchedulingToken = UUID()
+    private var alarmUpdatesTask: Task<Void, Never>?
+    #endif
+    
     override init() {
         super.init()
         UNUserNotificationCenter.current().delegate = NotificationPresenter.shared // 讓常駐物件處理通知彈窗
         setupDisplayTimer()       // 啟動 0.05 秒一次的畫面更新機制
         setupLifecycleObservers() // 監聽 App 進入背景或回到前台
+        #if os(iOS)
+        observeAlarmKitUpdates()   // 監聽 AlarmKit 的系統鬧鐘狀態
+        #endif
         #if os(macOS)
         prepareAudio()            // 預先載入鈴聲檔案
         #endif
@@ -123,7 +168,11 @@ class TimerManager: NSObject, ObservableObject {
     
     // App 開啟時的初始化設置
     func setupOnLaunch() {
+        #if os(iOS)
+        Task { await requestAlarmKitPermissionIfNeeded() }
+        #else
         requestNotificationPermission() // 向用戶請求允許發送通知
+        #endif
     }
     
     // 預載音效檔案到記憶體
@@ -195,11 +244,26 @@ class TimerManager: NSObject, ObservableObject {
         #if os(iOS)
         NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
             .sink { [weak self] _ in
-                self?.syncRemainingTime() // 立即重新對時，防止計時跑偏
+                self?.handleWillEnterForeground() // 立即重新對時，並在從 Alarm 回來時停止系統鬧鐘
             }
             .store(in: &cancellables)
         #endif
     }
+    
+    #if os(iOS)
+    private func handleWillEnterForeground() {
+        if isAlarming || (isRunning && (targetDate?.timeIntervalSinceNow ?? 1) <= 0) {
+            stopAlarmKitTimer()
+            isRunning = false
+            isAlarming = true
+            timeRemaining = 0
+            targetDate = nil
+            triggerHaptic()
+        } else {
+            syncRemainingTime()
+        }
+    }
+    #endif
 
     // MARK: - 用戶動作處理
     
@@ -217,9 +281,9 @@ class TimerManager: NSObject, ObservableObject {
         #if os(macOS)
         cancelNotifications()
         #else
-        configureAudioSession()
-        prepareAudio()
-        scheduleLocalNotification()
+        let token = UUID()
+        alarmSchedulingToken = token
+        Task { await scheduleAlarmKitTimer(expectedToken: token) }
         #endif
     }
 
@@ -227,7 +291,7 @@ class TimerManager: NSObject, ObservableObject {
     func pause() {
         isRunning = false
         targetDate = nil
-        cancelNotifications() // 暫停時取消預約的通知
+        cancelScheduledAlarm() // 暫停時取消預約的提醒
     }
 
     // 重置到最初狀態
@@ -253,12 +317,8 @@ class TimerManager: NSObject, ObservableObject {
         playAlarmSound()
         deliverAlarmNotificationImmediately()
         #else
-        // iOS 在開始倒數時已預約系統通知，歸零時只處理 App 內狀態，避免背景時補送第二則。
-        if isAppActive {
-            playAlarmSound()   // 前景才播
-        } else {
-            debugLog("iOS 背景通知已由預排通知處理，略過補送")
-        }
+        // iOS 的聲音交給 AlarmKit。前景若再用 AVAudioPlayer 播 alarm.caf，會和系統 Alarm 聲音重疊。
+        debugLog("iOS 提醒已由 AlarmKit 處理")
         #endif
         triggerHaptic()  // 讓機器震動
     }
@@ -267,6 +327,7 @@ class TimerManager: NSObject, ObservableObject {
     func nextStep() {
         let isLastStep = currentStep == .longRest
         isAlarming = false
+        stopScheduledAlarm()
         stopAlarmSound()
         
         let allSteps = TimerStep.allCases
@@ -316,6 +377,151 @@ class TimerManager: NSObject, ObservableObject {
     }
 
     // MARK: - 通知系統
+    
+    private func cancelScheduledAlarm() {
+        #if os(iOS)
+        alarmSchedulingToken = UUID()
+        if isAlarming {
+            stopAlarmKitTimer()
+        } else {
+            cancelAlarmKitTimer()
+        }
+        #else
+        cancelNotifications()
+        #endif
+    }
+    
+    private func stopScheduledAlarm() {
+        #if os(iOS)
+        stopAlarmKitTimer()
+        #else
+        cancelNotifications()
+        #endif
+    }
+    
+    #if os(iOS)
+    private func requestAlarmKitPermissionIfNeeded() async {
+        switch alarmManager.authorizationState {
+        case .notDetermined:
+            do {
+                let state = try await alarmManager.requestAuthorization()
+                debugLog("AlarmKit 權限請求結果: \(state)")
+            } catch {
+                print("AlarmKit 權限請求失敗: \(error)")
+            }
+        case .authorized:
+            debugLog("AlarmKit 已授權")
+        case .denied:
+            print("AlarmKit 權限被拒絕，無法排程系統鬧鐘")
+        @unknown default:
+            print("未知的 AlarmKit 權限狀態")
+        }
+    }
+    
+    private func scheduleAlarmKitTimer(expectedToken: UUID) async {
+        guard await isAlarmKitAuthorized() else {
+            await MainActor.run {
+                isRunning = false
+                targetDate = nil
+            }
+            return
+        }
+        
+        guard expectedToken == alarmSchedulingToken, isRunning else { return }
+        cancelAlarmKitTimer()
+        
+        let id = Alarm.ID()
+        let fireDate = Date().addingTimeInterval(max(1, timeRemaining))
+        let alert = AlarmPresentation.Alert(title: "時間到！")
+        let attributes = AlarmAttributes<EyeCareAlarmMetadata>(
+            presentation: AlarmPresentation(alert: alert),
+            metadata: EyeCareAlarmMetadata(stepName: currentStep.name),
+            tintColor: currentStep.themeColor
+        )
+        
+        do {
+            _ = try await alarmManager.schedule(
+                id: id,
+                configuration: .alarm(
+                    schedule: .fixed(fireDate),
+                    attributes: attributes,
+                    stopIntent: StopEyeCareAlarmIntent(alarmID: id),
+                    sound: .default
+                )
+            )
+            await MainActor.run {
+                scheduledAlarmID = id
+                debugLog("AlarmKit timer 已排程: \(id)")
+            }
+        } catch {
+            await MainActor.run {
+                isRunning = false
+                targetDate = nil
+            }
+            print("AlarmKit timer 排程失敗: \(error)")
+        }
+    }
+    
+    private func isAlarmKitAuthorized() async -> Bool {
+        switch alarmManager.authorizationState {
+        case .authorized:
+            return true
+        case .notDetermined:
+            do {
+                return try await alarmManager.requestAuthorization() == .authorized
+            } catch {
+                print("AlarmKit 權限請求失敗: \(error)")
+                return false
+            }
+        case .denied:
+            print("AlarmKit 權限被拒絕，無法排程系統鬧鐘")
+            return false
+        @unknown default:
+            return false
+        }
+    }
+    
+    private func cancelAlarmKitTimer() {
+        guard let id = scheduledAlarmID else { return }
+        do {
+            try alarmManager.cancel(id: id)
+            scheduledAlarmID = nil
+        } catch {
+            print("AlarmKit timer 取消失敗: \(error)")
+        }
+    }
+    
+    private func stopAlarmKitTimer() {
+        guard let id = scheduledAlarmID else { return }
+        do {
+            try alarmManager.stop(id: id)
+            scheduledAlarmID = nil
+        } catch {
+            cancelAlarmKitTimer()
+            print("AlarmKit timer 停止失敗，已改用取消: \(error)")
+        }
+    }
+    
+    private func observeAlarmKitUpdates() {
+        alarmUpdatesTask?.cancel()
+        alarmUpdatesTask = Task { [weak self] in
+            guard let self else { return }
+            for await alarms in AlarmManager.shared.alarmUpdates {
+                await MainActor.run {
+                    guard let id = self.scheduledAlarmID else { return }
+                    guard let alarm = alarms.first(where: { $0.id == id }) else {
+                        self.scheduledAlarmID = nil
+                        return
+                    }
+                    
+                    if alarm.state == .alerting {
+                        self.triggerAlarm()
+                    }
+                }
+            }
+        }
+    }
+    #endif
     
     // 預約一則在未來的通知（當倒計時歸零時由系統顯示）
     private func scheduleLocalNotification() {
