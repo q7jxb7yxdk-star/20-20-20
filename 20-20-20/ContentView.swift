@@ -1,7 +1,6 @@
 import SwiftUI           // 負責：建立 App 的畫面（按鈕、圓圈、文字等 UI 元素）
 @preconcurrency import UserNotifications // 負責：發送系統通知（當倒計時結束時，手機頂部彈出的提醒）
 import Combine           // 負責：資料流處理（讓「計時器大腦」與「畫面」之間的數據同步）
-import AVFoundation      // 負責：播放音效（控制鬧鐘鈴聲的播放與暫停）
 
 // 根據不同的作業系統，引入專屬的系統工具箱123
 #if os(iOS)
@@ -145,7 +144,7 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
         completionHandler(presentationOptions)
         #else
         if #available(iOS 14.0, macOS 11.0, *) {
-            // iOS 前景時由 AVAudioPlayer 播自訂聲音，通知只顯示畫面，避免聲音重疊。
+            // iOS 的提醒聲由 AlarmKit 處理，通知只顯示畫面，避免聲音重疊。
             completionHandler([.banner, .list])
         } else {
             completionHandler([.alert])
@@ -171,12 +170,9 @@ class TimerManager: NSObject, ObservableObject {
     // 用 Set 收集多個訂閱，TimerManager 釋放時這些訂閱也會一起取消。
     private var cancellables = Set<AnyCancellable>()    // 系統清理記憶體用
     
-    // 音訊播放器物件
     #if os(macOS)
+    // macOS 沒有使用 AlarmKit，所以仍由 App 內的 NSSound 播放提醒聲。
     private var alarmSound: NSSound?
-    #else
-    private var audioPlayer: AVAudioPlayer?
-    private var isAudioSessionConfigured = false
     #endif
     private let soundFileName = "alarm"                 // 預備播放的檔案名稱
     private let scheduledNotificationIdentifier = "202020Notification.scheduled"
@@ -216,33 +212,21 @@ class TimerManager: NSObject, ObservableObject {
         #endif
     }
     
+    #if os(macOS)
     // 預載音效檔案到記憶體
     private func prepareAudio() {
-        #if os(iOS)
-        // 如果已經建立過播放器，就不重複載入，避免浪費記憶體與 I/O。
-        guard audioPlayer == nil else { return }
-        #endif
-        
         guard let url = Bundle.main.url(forResource: soundFileName, withExtension: "caf") else {
             print("找不到音效文件: \(soundFileName).caf")
             return
         }
-        #if os(macOS)
+
         // NSSound 是 macOS 的聲音播放類別；byReference: false 代表把聲音資料載入記憶體。
         alarmSound = NSSound(contentsOf: url, byReference: false)
         if alarmSound == nil {
             print("音訊初始化失敗: 無法載入 \(soundFileName).caf")
         }
-        #else
-        do {
-            // AVAudioPlayer 適合播放本機短音效；prepareToPlay 可降低第一次播放的延遲。
-            audioPlayer = try AVAudioPlayer(contentsOf: url)
-            audioPlayer?.prepareToPlay()
-        } catch {
-            print("音訊初始化失敗: \(error)")
-        }
-        #endif
     }
+    #endif
 
     // 建立一個持續運轉的計時器，每 0.2 秒執行一次 syncRemainingTime 函數
     private func setupDisplayTimer() {
@@ -351,7 +335,7 @@ class TimerManager: NSObject, ObservableObject {
         playAlarmSound()
         deliverAlarmNotificationImmediately()
         #else
-        // iOS 的聲音交給 AlarmKit。前景若再用 AVAudioPlayer 播 alarm.caf，會和系統 Alarm 聲音重疊。
+        // iOS 的聲音交給 AlarmKit，App 內不再另外播放 alarm.caf，避免聲音重疊。
         debugLog("iOS 提醒已由 AlarmKit 處理")
         #endif
         triggerHaptic()  // 讓機器震動
@@ -385,19 +369,12 @@ class TimerManager: NSObject, ObservableObject {
         alarmSound?.stop()
         alarmSound?.volume = 1
         alarmSound?.play()
-        #else
-        prepareAudio()
-        audioPlayer?.currentTime = 0
-        audioPlayer?.volume = 1
-        audioPlayer?.play()
         #endif
     }
     
     private func stopAlarmSound() {
         #if os(macOS)
         alarmSound?.stop()
-        #else
-        audioPlayer?.stop()
         #endif
     }
 
