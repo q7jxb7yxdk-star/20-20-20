@@ -244,26 +244,6 @@ class TimerManager: NSObject, ObservableObject {
         #endif
     }
 
-    #if os(iOS)
-    // 專為 iOS 設置：讓聲音在靜音模式下也能播放，或壓低背景音樂
-    private func configureAudioSession() {
-        guard !isAudioSessionConfigured else { return }
-        
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(
-                .playback,
-                mode: .default,
-                options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers]
-            )
-            try session.setActive(true)
-            isAudioSessionConfigured = true
-        } catch {
-            print("Audio Session 配置失敗: \(error)")
-        }
-    }
-    #endif
-
     // 建立一個持續運轉的計時器，每 0.2 秒執行一次 syncRemainingTime 函數
     private func setupDisplayTimer() {
         // Timer.publish 建立一個 Combine publisher。
@@ -418,19 +398,6 @@ class TimerManager: NSObject, ObservableObject {
         alarmSound?.stop()
         #else
         audioPlayer?.stop()
-        #endif
-    }
-
-    // 判斷 App 是否在前景，避免 macOS 目標編譯到 iOS 專用的 UIApplication
-    private var isAppActive: Bool {
-        // 條件編譯能讓同一份檔案同時支援 iOS 和 macOS。
-        // iOS 沒有 NSApplication，macOS 也沒有 UIApplication，所以必須分開寫。
-        #if os(iOS)
-        return UIApplication.shared.applicationState == .active
-        #elseif os(macOS)
-        return NSApplication.shared.isActive
-        #else
-        return true
         #endif
     }
 
@@ -589,25 +556,6 @@ class TimerManager: NSObject, ObservableObject {
     }
     #endif
     
-    // 預約一則在未來的通知（當倒計時歸零時由系統顯示）
-    private func scheduleLocalNotification() {
-        // 目前主要是 macOS / 備援通知路徑；排程前先清掉舊通知，避免多則通知一起跳出。
-        cancelNotifications()
-        logNotificationSettings(context: "排程倒數通知前")
-        
-        let content = makeAlarmNotificationContent()
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, timeRemaining), repeats: false)
-        let request = UNNotificationRequest(identifier: scheduledNotificationIdentifier, content: content, trigger: trigger)
-        
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error {
-                print("通知排程失敗: \(error)")
-            } else {
-                self.debugLog("通知已排程: \(self.scheduledNotificationIdentifier)")
-            }
-        }
-    }
-
     // 當 macOS App 在背景仍然活著並自行倒數到零時，補發一則立即通知
     private func deliverAlarmNotificationImmediately() {
         let center = UNUserNotificationCenter.current()
