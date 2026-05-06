@@ -57,6 +57,8 @@ enum TimerStep: Int, CaseIterable {
 }
 
 enum AppConfiguration {
+    // typealias 可以把一組複雜型別取一個好懂的名字。
+    // 這裡代表「三種倒數時間」的設定集合，之後使用 AppConfiguration.duration.work 會比較直覺。
     typealias DurationConfiguration = (work: Int, eyeCare: Int, longRest: Int)
     
     // 每個階段的持續時間設定（秒）
@@ -71,6 +73,8 @@ enum AppConfiguration {
     }()
     
     #if os(iOS)
+    // AlarmKit 使用自己的聲音設定型別。
+    // DEBUG 使用系統預設聲音，避免開發時一直聽到正式鬧鐘聲；正式版才使用專案內的 alarm.caf。
     static var alarmKitSound: AlertConfiguration.AlertSound {
         #if DEBUG
         return .default
@@ -84,10 +88,14 @@ enum AppConfiguration {
 // MARK: - AlarmKit 資料
 
 #if os(iOS)
+// AlarmKit 要求我們提供一個符合 AlarmMetadata 的資料型別。
+// 這份 metadata 會跟著系統鬧鐘一起保存，之後可以用來知道是哪個階段觸發提醒。
 nonisolated struct EyeCareAlarmMetadata: AlarmMetadata {
     let stepName: String
 }
 
+// LiveActivityIntent 是給系統鬧鐘畫面上的按鈕使用的動作。
+// 使用者即使不打開 App，也可以在系統介面上按「停止」，然後執行這段程式。
 struct StopEyeCareAlarmIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "停止護眼提醒"
     static var supportedModes: IntentModes = .background
@@ -96,15 +104,20 @@ struct StopEyeCareAlarmIntent: LiveActivityIntent {
     var alarmID: String
     
     init() {
+        // AppIntents 需要一個無參數 init，系統才能建立這個 Intent。
         alarmID = ""
     }
     
     init(alarmID: Alarm.ID) {
+        // Alarm.ID 本質上是 UUID；轉成字串後才能放進 @Parameter。
         self.alarmID = alarmID.uuidString
     }
     
     func perform() async throws -> some IntentResult {
+        // 系統按鈕回傳的是字串，所以這裡要先轉回 UUID 才能找到原本排程的鬧鐘。
         if let id = UUID(uuidString: alarmID) {
+            // stop 用於停止正在響的鬧鐘；cancel 用於取消尚未響的鬧鐘。
+            // 兩個都嘗試，讓按鈕在不同狀態下都能盡量生效。
             try? AlarmManager.shared.stop(id: id)
             try? AlarmManager.shared.cancel(id: id)
         }
@@ -115,6 +128,8 @@ struct StopEyeCareAlarmIntent: LiveActivityIntent {
 
 // MARK: - 2. 核心大腦 (處理計時邏輯、音效與通知)
 final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
+    // 使用 singleton，確保整個 App 只有一個通知代理物件。
+    // 如果 delegate 被釋放，通知回呼可能就收不到，所以用 static shared 讓它常駐。
     static let shared = NotificationPresenter()
     
     private override init() {
@@ -124,6 +139,8 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     // 設定當 App 開啟時，通知彈窗也能在螢幕頂部顯示
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         #if os(macOS)
+        // 這裡用 rawValue 是為了相容不同 macOS SDK 的通知選項。
+        // 4/8/16 分別對應 banner、list、sound 類似的呈現能力。
         let presentationOptions = UNNotificationPresentationOptions(rawValue: 4 | 8 | 16)
         completionHandler(presentationOptions)
         #else
@@ -145,8 +162,12 @@ class TimerManager: NSObject, ObservableObject {
     @Published var isRunning = false                    // 是否正在跑
     @Published var isAlarming = false                   // 是否正在響鈴
     
+    // targetDate 是「絕對時間點」，不是每秒遞減的計數器。
+    // 好處：App 暫時卡住或進入背景後，回來時仍可用現在時間重新算出準確剩餘秒數。
     private var targetDate: Date?                       // 預計結束的時間點
+    // AnyCancellable 是 Combine 的訂閱憑證；保存它，Timer 才會持續發送事件。
     private var displayTimer: AnyCancellable?           // 控制畫面跳動的定時器
+    // 用 Set 收集多個訂閱，TimerManager 釋放時這些訂閱也會一起取消。
     private var cancellables = Set<AnyCancellable>()    // 系統清理記憶體用
     
     // 音訊播放器物件
@@ -163,8 +184,12 @@ class TimerManager: NSObject, ObservableObject {
     
     #if os(iOS)
     private let alarmManager = AlarmManager.shared
+    // 保存目前排程中的 Alarm ID，之後暫停、重置、停止響鈴時才知道要操作哪一個系統鬧鐘。
     private var scheduledAlarmID: Alarm.ID?
+    // token 用來避免非同步排程的競態問題：
+    // 如果使用者快速按開始/暫停，舊的 Task 完成時不能覆蓋新的狀態。
     private var alarmSchedulingToken = UUID()
+    // 保存監聽 AlarmKit 更新的 Task，之後如需重新監聽或物件釋放時可以取消。
     private var alarmUpdatesTask: Task<Void, Never>?
     #endif
     
@@ -193,6 +218,7 @@ class TimerManager: NSObject, ObservableObject {
     // 預載音效檔案到記憶體
     private func prepareAudio() {
         #if os(iOS)
+        // 如果已經建立過播放器，就不重複載入，避免浪費記憶體與 I/O。
         guard audioPlayer == nil else { return }
         #endif
         
@@ -201,12 +227,14 @@ class TimerManager: NSObject, ObservableObject {
             return
         }
         #if os(macOS)
+        // NSSound 是 macOS 的聲音播放類別；byReference: false 代表把聲音資料載入記憶體。
         alarmSound = NSSound(contentsOf: url, byReference: false)
         if alarmSound == nil {
             print("音訊初始化失敗: 無法載入 \(soundFileName).caf")
         }
         #else
         do {
+            // AVAudioPlayer 適合播放本機短音效；prepareToPlay 可降低第一次播放的延遲。
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.prepareToPlay()
         } catch {
@@ -237,19 +265,24 @@ class TimerManager: NSObject, ObservableObject {
 
     // 建立一個持續運轉的計時器，每 0.05 秒執行一次 syncRemainingTime 函數
     private func setupDisplayTimer() {
+        // Timer.publish 建立一個 Combine publisher。
+        // autoconnect 代表一有人訂閱就自動開始，不需要手動 connect。
         displayTimer = Timer.publish(every: 0.05, on: .main, in: .common)
             .autoconnect()
+            // weak self 避免 Timer 強引用 TimerManager，造成物件永遠無法釋放。
             .sink { [weak self] _ in self?.syncRemainingTime() }
     }
 
     // 計算「現在」與「目標時間」差了幾秒
     private func syncRemainingTime() {
+        // guard 提早退出：只有正在倒數且有目標時間時，才需要更新畫面。
         guard isRunning, let target = targetDate else { return }
         let diff = target.timeIntervalSinceNow // 計算秒數差
         
         if diff > 0 {
             timeRemaining = diff // 更新剩餘時間
         } else if isRunning {
+            // diff <= 0 表示已經到達或超過目標時間；此時切到響鈴狀態。
             triggerAlarm() // 歸零，觸發鬧鐘
         }
     }
@@ -290,6 +323,7 @@ class TimerManager: NSObject, ObservableObject {
 
     // 開始計時：紀錄未來的結束時間點並預約系統通知
     func start() {
+        // 用目前剩餘秒數加上現在時間，得到這輪倒數真正應該結束的時刻。
         targetDate = Date().addingTimeInterval(timeRemaining)
         isRunning = true
         isAlarming = false
@@ -298,6 +332,8 @@ class TimerManager: NSObject, ObservableObject {
         #else
         let token = UUID()
         alarmSchedulingToken = token
+        // AlarmKit API 是 async，所以放進 Task。
+        // expectedToken 讓排程完成時能確認它仍然是最新那次開始操作。
         Task { await scheduleAlarmKitTimer(expectedToken: token) }
         #endif
     }
@@ -305,6 +341,7 @@ class TimerManager: NSObject, ObservableObject {
     // 暫停計時
     func pause() {
         isRunning = false
+        // 暫停時清掉 targetDate；下次 start 會用目前 timeRemaining 重新建立新的結束時間。
         targetDate = nil
         cancelScheduledAlarm() // 暫停時取消預約的提醒
     }
@@ -321,6 +358,7 @@ class TimerManager: NSObject, ObservableObject {
 
     // 觸發鬧鈴
     func triggerAlarm() {
+        // 防止重複觸發：Timer 每 0.05 秒跑一次，如果不擋住，可能會連續呼叫多次。
         guard !isAlarming else { return }
         isRunning = false
         isAlarming = true
@@ -340,12 +378,14 @@ class TimerManager: NSObject, ObservableObject {
 
     // 前往下一階段
     func nextStep() {
+        // 先記住目前是不是最後一關，因為下面會立刻改 currentStep。
         let isLastStep = currentStep == .longRest
         isAlarming = false
         stopScheduledAlarm()
         stopAlarmSound()
         
         let allSteps = TimerStep.allCases
+        // rawValue + 1 代表往下一階段；% allSteps.count 讓最後一階段之後回到第一階段。
         let nextIndex = (currentStep.rawValue + 1) % allSteps.count
         currentStep = allSteps[nextIndex]
         timeRemaining = Double(currentStep.seconds)
@@ -382,6 +422,8 @@ class TimerManager: NSObject, ObservableObject {
 
     // 判斷 App 是否在前景，避免 macOS 目標編譯到 iOS 專用的 UIApplication
     private var isAppActive: Bool {
+        // 條件編譯能讓同一份檔案同時支援 iOS 和 macOS。
+        // iOS 沒有 NSApplication，macOS 也沒有 UIApplication，所以必須分開寫。
         #if os(iOS)
         return UIApplication.shared.applicationState == .active
         #elseif os(macOS)
@@ -434,6 +476,7 @@ class TimerManager: NSObject, ObservableObject {
     }
     
     private func scheduleAlarmKitTimer(expectedToken: UUID) async {
+        // 如果沒有權限，直接停止倒數，避免畫面顯示正在跑但系統其實不會提醒。
         guard await isAlarmKitAuthorized() else {
             await MainActor.run {
                 isRunning = false
@@ -442,12 +485,15 @@ class TimerManager: NSObject, ObservableObject {
             return
         }
         
+        // 再次確認 token 和狀態，避免「舊的非同步排程」在使用者暫停後仍成功建立鬧鐘。
         guard expectedToken == alarmSchedulingToken, isRunning else { return }
         cancelAlarmKitTimer()
         
         let id = Alarm.ID()
+        // 至少 1 秒後才觸發，避免系統不接受 0 秒或負數排程。
         let fireDate = Date().addingTimeInterval(max(1, timeRemaining))
         let alert = AlarmPresentation.Alert(title: "時間到！")
+        // attributes 定義系統鬧鐘畫面上要呈現的文字、顏色與自訂資料。
         let attributes = AlarmAttributes<EyeCareAlarmMetadata>(
             presentation: AlarmPresentation(alert: alert),
             metadata: EyeCareAlarmMetadata(stepName: currentStep.name),
@@ -521,15 +567,19 @@ class TimerManager: NSObject, ObservableObject {
         alarmUpdatesTask?.cancel()
         alarmUpdatesTask = Task { [weak self] in
             guard let self else { return }
+            // alarmUpdates 是 AsyncSequence；只要系統鬧鐘狀態改變，這個 for-await 就會收到新資料。
             for await alarms in AlarmManager.shared.alarmUpdates {
                 await MainActor.run {
+                    // UI 狀態必須在主執行緒更新，所以包在 MainActor.run。
                     guard let id = self.scheduledAlarmID else { return }
                     guard let alarm = alarms.first(where: { $0.id == id }) else {
+                        // 找不到原本的鬧鐘，代表它可能已被系統或使用者取消。
                         self.scheduledAlarmID = nil
                         return
                     }
                     
                     if alarm.state == .alerting {
+                        // AlarmKit 告訴我們系統鬧鐘正在響，App 內也同步切成「響鈴」狀態。
                         self.triggerAlarm()
                     }
                 }
@@ -540,6 +590,7 @@ class TimerManager: NSObject, ObservableObject {
     
     // 預約一則在未來的通知（當倒計時歸零時由系統顯示）
     private func scheduleLocalNotification() {
+        // 目前主要是 macOS / 備援通知路徑；排程前先清掉舊通知，避免多則通知一起跳出。
         cancelNotifications()
         logNotificationSettings(context: "排程倒數通知前")
         
@@ -589,6 +640,8 @@ class TimerManager: NSObject, ObservableObject {
         }
     }
     private func makeAlarmNotificationContent() -> UNMutableNotificationContent {
+        // UNMutableNotificationContent 是系統通知的內容物件。
+        // title/body/sound 都在這裡設定，再交給 UNNotificationRequest 排程或立即送出。
         let content = UNMutableNotificationContent()
         content.title = "時間到！"
         content.body = "「\(currentStep.name)」已完成，請開始下一階段。"
@@ -612,6 +665,7 @@ class TimerManager: NSObject, ObservableObject {
     
     private func logNotificationSettings(context: String) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
+            // getNotificationSettings 是非同步回呼；這裡只做除錯輸出，不影響主流程。
             let baseMessage = "\(context) - authorization: \(settings.authorizationStatus.rawValue), alerts: \(settings.alertSetting.rawValue), sounds: \(settings.soundSetting.rawValue), notificationCenter: \(settings.notificationCenterSetting.rawValue)"
             
             #if os(macOS)
@@ -673,6 +727,7 @@ class TimerManager: NSObject, ObservableObject {
     }
     
     private func debugLog(_ message: String) {
+        // 統一由這個開關控制除錯訊息，正式使用時可以保持 Console 乾淨。
         guard isVerboseLoggingEnabled else { return }
         print(message)
     }
@@ -691,6 +746,8 @@ class TimerManager: NSObject, ObservableObject {
 
 // MARK: - 3. 介面外觀區 (使用 SwiftUI 繪製)
 struct ContentView: View {
+    // @StateObject 代表 SwiftUI 會替這個 View 持有 TimerManager 的生命週期。
+    // 如果改用 @ObservedObject，畫面重建時可能會重新建立 manager，導致倒數狀態遺失。
     @StateObject private var manager = TimerManager() // 引用核心大腦
     
     var body: some View {
@@ -717,19 +774,24 @@ struct ContentView: View {
 }
 
 #if os(macOS)
+// NSViewRepresentable 是 SwiftUI 與 AppKit 之間的橋接器。
+// SwiftUI 本身不好直接控制 macOS 視窗初始大小，所以放一個隱形 NSView 來取得 window。
 struct WindowInitialSizeConfigurator: NSViewRepresentable {
     let width: CGFloat
     let height: CGFloat
     
     func makeCoordinator() -> Coordinator {
+        // Coordinator 用來保存跨 updateNSView 呼叫的狀態。
         Coordinator()
     }
     
     func makeNSView(context: Context) -> NSView {
+        // 這個 NSView 不顯示任何東西，只是為了拿到它所屬的 window。
         NSView()
     }
     
     func updateNSView(_ nsView: NSView, context: Context) {
+        // updateNSView 可能被 SwiftUI 呼叫很多次，所以用 didConfigure 確保只設定一次視窗大小。
         guard !context.coordinator.didConfigure else { return }
         context.coordinator.didConfigure = true
         
@@ -751,6 +813,7 @@ extension ContentView {
     
     // 標題顯示組件
     private var statusHeader: some View {
+        // 把畫面拆成多個 private computed property，body 會更短，也更容易閱讀與維護。
         VStack(spacing: 12) {
             Text("20-20-20 護眼助理")
                 .font(.system(.caption, design: .rounded))
@@ -763,6 +826,7 @@ extension ContentView {
             Text(manager.currentStep.name)
                 .font(.title2.bold())
                 .foregroundColor(manager.isAlarming ? .red : .primary)
+                // value 指定動畫只在 isAlarming 改變時觸發，避免所有狀態更新都套動畫。
                 .animation(.easeInOut, value: manager.isAlarming)
         }
     }
@@ -776,6 +840,7 @@ extension ContentView {
             
             // 彩色進度圈
             Circle()
+                // trim 只畫出圓的一部分；剩餘秒數越少，彩色弧線越短。
                 .trim(from: 0, to: manager.timeRemaining / Double(manager.currentStep.seconds))
                 .stroke(
                     manager.isAlarming ? Color.red : manager.currentStep.themeColor,
@@ -802,6 +867,8 @@ extension ContentView {
     private var actionControls: some View {
         HStack(spacing: 40) {
             Button(action: {
+                // 同一顆主按鈕在不同狀態下做不同事：
+                // 響鈴時是「確認並進下一階段」，平常是「開始/暫停」。
                 if manager.isAlarming {
                     manager.nextStep() // 響鈴時點一下進入下一關
                 } else {
@@ -842,6 +909,7 @@ extension ContentView {
     // 進度圓點組件
     private var stepDots: some View {
         HStack(spacing: 10) {
+            // ForEach 會依序產生四個小點，對應 TimerStep 的四個階段。
             ForEach(0..<TimerStep.allCases.count, id: \.self) { index in
                 Circle()
                     .fill(manager.currentStep.rawValue == index ? manager.currentStep.themeColor : Color.gray.opacity(0.2))
@@ -853,12 +921,15 @@ extension ContentView {
     
     // 控制按鈕圖示變換
     private var mainButtonIcon: String {
+        // 用狀態推導 UI，而不是在按鈕裡手動記錄圖示。
+        // 這是 SwiftUI 常見做法：資料狀態改變，畫面自然跟著改變。
         if manager.isAlarming { return "checkmark" }
         return manager.isRunning ? "pause.fill" : "play.fill"
     }
     
     // 控制按鈕顏色變換
     private var mainButtonColor: Color {
+        // 將顏色邏輯集中在這裡，Button 的 View 宣告就能保持乾淨。
         if manager.isAlarming { return .orange }
         return manager.isRunning ? .red : .blue
     }
@@ -874,6 +945,7 @@ extension ContentView {
     
     // 數學計算：將秒數格式化為 00:00 顯示
     private func timeString(from totalSeconds: Int) -> String {
+        // 整數除法取得分鐘，取餘數取得秒數。
         let m = totalSeconds / 60
         let s = totalSeconds % 60
         return String(format: "%02d:%02d", m, s)
