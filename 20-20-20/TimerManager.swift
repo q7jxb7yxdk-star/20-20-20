@@ -111,6 +111,12 @@ class TimerManager: NSObject, ObservableObject {
 
     // 處理當 App 從後台回到前台時的情況
     private func setupLifecycleObservers() {
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .sink { [weak self] _ in
+                self?.handleConfigurationDidChange()
+            }
+            .store(in: &cancellables)
+        
         #if os(iOS)
         NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
             .sink { [weak self] _ in
@@ -118,6 +124,13 @@ class TimerManager: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
         #endif
+    }
+    
+    private func handleConfigurationDidChange() {
+        // 如果倒數正在跑，臨時改時間會令 targetDate 變得不清楚，所以不改動當前倒數。
+        // 當計時器停低時，就即時用新模式的秒數更新畫面，方便測試 Debug / Release 切換。
+        guard !isRunning, !isAlarming else { return }
+        timeRemaining = Double(currentStep.seconds)
     }
     
     #if os(iOS)
@@ -130,6 +143,7 @@ class TimerManager: NSObject, ObservableObject {
             targetDate = nil
             triggerHaptic()
         } else {
+            handleConfigurationDidChange()
             syncRemainingTime()
         }
     }

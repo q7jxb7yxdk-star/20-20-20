@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PreferenceSpecifiers</key>
+    <array>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>運行模式</string>
+            <key>FooterText</key>
+            <string>Debug 使用短時間測試；Release 使用正式護眼時間。</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSMultiValueSpecifier</string>
+            <key>Title</key>
+            <string>模式</string>
+            <key>Key</key>
+            <string>app_run_mode</string>
+            <key>DefaultValue</key>
+            <string>release</string>
+            <key>Titles</key>
+            <array>
+                <string>Debug 測試模式</string>
+                <string>Release 正式模式</string>
+            </array>
+            <key>Values</key>
+            <array>
+                <string>debug</string>
+                <string>release</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

@@ -42,9 +42,11 @@ App 目前有四個階段，由 `TimerStep` 定義：
 | `EyeCareTimerApp.swift` | App 入口，建立第一個畫面，設定通知 delegate |
 | `ContentView.swift` | SwiftUI 畫面、按鈕、圓圈、狀態文字、macOS 視窗大小 |
 | `TimerStep.swift` | 倒數階段資料、App 共用設定 |
+| `SettingsView.swift` | macOS App 內設定畫面 |
 | `TimerManager.swift` | 倒數核心邏輯、開始/暫停/重置/下一階段、通知、音效、觸感 |
 | `NotificationPresenter.swift` | App 在前台時如何顯示通知 |
 | `AlarmKitSupport.swift` | iOS AlarmKit 所需 metadata 和停止鬧鐘 intent |
+| `Settings.bundle/Root.plist` | iOS 系統設定 App 內顯示的 App 設定 |
 
 這樣拆的好處是：畫面、資料、業務邏輯、系統通知、iOS AlarmKit 不會全部塞在同一個檔案。當 App 變大時，這種分工會令閱讀和維護容易好多。
 
@@ -193,16 +195,51 @@ var icon: String {
 `AppConfiguration` 集中放 App 共用設定：
 
 ```swift
-static let duration: DurationConfiguration = {
-    #if DEBUG
-    return (work: 10, eyeCare: 5, longRest: 8)
-    #else
-    return (work: 20 * 60, eyeCare: 20, longRest: 3 * 60)
-    #endif
-}()
+static var duration: DurationConfiguration {
+    switch runMode {
+    case .debug:
+        return (work: 10, eyeCare: 5, longRest: 8)
+    case .release:
+        return (work: 20 * 60, eyeCare: 20, longRest: 3 * 60)
+    }
+}
 ```
 
-`DEBUG` 模式時間短，正式版時間長。這樣開發時不用真的等 20 分鐘才測到通知。
+`Debug 測試模式` 時間短，`Release 正式模式` 時間長。這樣不用重新編譯 App，都可以即時切換測試時間和正式時間。
+
+目前模式不是再靠 `#if DEBUG` 編譯旗標決定，而是讀取 `UserDefaults`：
+
+```swift
+static var runMode: RunMode {
+    let rawValue = UserDefaults.standard.string(forKey: DefaultsKey.runMode)
+    return RunMode(rawValue: rawValue ?? "") ?? .release
+}
+```
+
+好處是同一個安裝好的 App，可以隨時在設定入面切換模式。
+
+### 5.4 Debug / Release 模式設定
+
+App 使用同一個 UserDefaults key：
+
+```swift
+app_run_mode
+```
+
+macOS 版本由 `SettingsView.swift` 提供 App 內設定畫面。使用者可以在 App 選單打開 Settings，然後選擇：
+
+- `Debug 測試模式`
+- `Release 正式模式`
+
+iOS 版本由 `Settings.bundle/Root.plist` 提供系統設定畫面。安裝 App 後，可以去：
+
+```text
+iPhone 設定 > 20-20-20 > 模式
+```
+
+選擇 Debug 或 Release。因為 iOS Settings.bundle 也是寫入同一個 `app_run_mode`，所以 App 重新回到前台或下一次讀設定時，就會用新模式。
+
+`TimerManager` 亦監聽 `UserDefaults.didChangeNotification`。如果計時器目前停低，切換模式後會即時更新畫面上的剩餘時間；如果倒數正在跑，App 不會臨時改動當前倒數，避免 targetDate 被中途改亂。
 
 ## 6. 核心邏輯：TimerManager.swift
 

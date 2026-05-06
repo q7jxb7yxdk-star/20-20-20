@@ -5,6 +5,7 @@ import SwiftUI
 @main
 struct EyeCareTimerApp: App {
     init() {
+        AppConfiguration.registerDefaults()
         // App 一啟動就指定通知代理。
         // 這樣通知到達時，NotificationPresenter 就能決定要不要彈出 banner、播放提示等。
         UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
@@ -16,6 +17,12 @@ struct EyeCareTimerApp: App {
         }
         #if os(macOS)
         .windowStyle(.hiddenTitleBar) // Mac 版隱藏頂部標題列
+        #endif
+        
+        #if os(macOS)
+        Settings {
+            SettingsView()
+        }
         #endif
     }
 }
