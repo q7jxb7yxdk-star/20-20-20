@@ -4,8 +4,6 @@
 <dict>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>20-20-20 護眼助理會使用系統鬧鐘在每個階段結束時提醒你。</string>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
 	<key>NSUserNotificationAlertStyle</key>
 	<string>alert</string>
 </dict>
