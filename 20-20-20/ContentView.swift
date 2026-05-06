@@ -1,9 +1,9 @@
 import SwiftUI           // 負責：建立 App 的畫面（按鈕、圓圈、文字等 UI 元素）
-import UserNotifications // 負責：發送系統通知（當倒計時結束時，手機頂部彈出的提醒）
+@preconcurrency import UserNotifications // 負責：發送系統通知（當倒計時結束時，手機頂部彈出的提醒）
 import Combine           // 負責：資料流處理（讓「計時器大腦」與「畫面」之間的數據同步）
 import AVFoundation      // 負責：播放音效（控制鬧鐘鈴聲的播放與暫停）
 
-// 根據不同的作業系統，引入專屬的系統工具箱
+// 根據不同的作業系統，引入專屬的系統工具箱123
 #if os(iOS)
 import AlarmKit          // 負責：使用系統級鬧鐘/計時器控制提醒
 import AppIntents        // 負責：提供 AlarmKit 按鈕觸發的系統意圖
@@ -154,6 +154,7 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     }
 }
 
+@MainActor
 class TimerManager: NSObject, ObservableObject {
     
     // 被標註為 @Published 的變數，一旦改變，畫面就會跟著重新繪製
@@ -180,7 +181,7 @@ class TimerManager: NSObject, ObservableObject {
     private let soundFileName = "alarm"                 // 預備播放的檔案名稱
     private let scheduledNotificationIdentifier = "202020Notification.scheduled"
     private let deliveredNotificationIdentifierPrefix = "202020Notification.alarm"
-    private let isVerboseLoggingEnabled = false
+    nonisolated private static let isVerboseLoggingEnabled = false
     
     #if os(iOS)
     private let alarmManager = AlarmManager.shared
@@ -196,7 +197,7 @@ class TimerManager: NSObject, ObservableObject {
     override init() {
         super.init()
         UNUserNotificationCenter.current().delegate = NotificationPresenter.shared // 讓常駐物件處理通知彈窗
-        setupDisplayTimer()       // 啟動 0.05 秒一次的畫面更新機制
+        setupDisplayTimer()       // 啟動 0.2 秒一次的畫面更新機制
         setupLifecycleObservers() // 監聽 App 進入背景或回到前台
         #if os(iOS)
         observeAlarmKitUpdates()   // 監聽 AlarmKit 的系統鬧鐘狀態
@@ -263,11 +264,11 @@ class TimerManager: NSObject, ObservableObject {
     }
     #endif
 
-    // 建立一個持續運轉的計時器，每 0.05 秒執行一次 syncRemainingTime 函數
+    // 建立一個持續運轉的計時器，每 0.2 秒執行一次 syncRemainingTime 函數
     private func setupDisplayTimer() {
         // Timer.publish 建立一個 Combine publisher。
         // autoconnect 代表一有人訂閱就自動開始，不需要手動 connect。
-        displayTimer = Timer.publish(every: 0.05, on: .main, in: .common)
+        displayTimer = Timer.publish(every: 0.2, on: .main, in: .common)
             .autoconnect()
             // weak self 避免 Timer 強引用 TimerManager，造成物件永遠無法釋放。
             .sink { [weak self] _ in self?.syncRemainingTime() }
@@ -358,7 +359,7 @@ class TimerManager: NSObject, ObservableObject {
 
     // 觸發鬧鈴
     func triggerAlarm() {
-        // 防止重複觸發：Timer 每 0.05 秒跑一次，如果不擋住，可能會連續呼叫多次。
+        // 防止重複觸發：Timer 會定期跑一次，如果不擋住，可能會連續呼叫多次。
         guard !isAlarming else { return }
         isRunning = false
         isAlarming = true
@@ -626,15 +627,16 @@ class TimerManager: NSObject, ObservableObject {
             content: makeAlarmNotificationContent(),
             trigger: trigger
         )
+        let requestIdentifier = request.identifier
         
         center.add(request) { error in
             if let error {
                 print("立即通知發送失敗: \(error)")
             } else {
                 #if os(macOS)
-                self.debugLog("macOS 原生通知已排程: \(request.identifier)")
+                self.debugLog("macOS 原生通知已排程: \(requestIdentifier)")
                 #else
-                self.debugLog("立即通知已加入: \(request.identifier)")
+                self.debugLog("立即通知已加入: \(requestIdentifier)")
                 #endif
             }
         }
@@ -691,7 +693,7 @@ class TimerManager: NSObject, ObservableObject {
                 .filter { $0.hasPrefix(deliveredNotificationIdentifierPrefix) }
             
             if !ids.isEmpty {
-                center.removeDeliveredNotifications(withIdentifiers: ids)
+                UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids)
             }
         }
     }
@@ -716,7 +718,7 @@ class TimerManager: NSObject, ObservableObject {
                 return
             }
             
-            center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
                 if let error {
                     print("通知權限請求失敗: \(error)")
                 } else {
@@ -726,13 +728,13 @@ class TimerManager: NSObject, ObservableObject {
         }
     }
     
-    private func debugLog(_ message: String) {
+    nonisolated private func debugLog(_ message: String) {
         // 統一由這個開關控制除錯訊息，正式使用時可以保持 Console 乾淨。
-        guard isVerboseLoggingEnabled else { return }
+        guard Self.isVerboseLoggingEnabled else { return }
         print(message)
     }
     
-    private static func authorizationStatusDescription(_ status: UNAuthorizationStatus) -> String {
+    nonisolated private static func authorizationStatusDescription(_ status: UNAuthorizationStatus) -> String {
         switch status {
         case .notDetermined: return "notDetermined (0)"
         case .denied: return "denied (1)"
@@ -847,7 +849,7 @@ extension ContentView {
                     style: StrokeStyle(lineWidth: 15, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90)) // 起點修正到正上方
-                .animation(.linear(duration: 0.05), value: manager.timeRemaining)
+                .animation(.linear(duration: 0.2), value: manager.timeRemaining)
             
             VStack(spacing: 10) {
                 // 圖示
