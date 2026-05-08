@@ -14,19 +14,21 @@ struct ContentView: View {
     @StateObject private var manager = TimerManager() // 引用核心大腦
     
     var body: some View {
-        ZStack { // 堆疊層：由下往上蓋
-            backgroundColor.ignoresSafeArea() // 最底層的背景色
+        GeometryReader { proxy in
+            let safeSize = proxy.size
+            let isLandscape = safeSize.width > safeSize.height
+            let circleSize = progressCircleSize(for: safeSize, isLandscape: isLandscape)
+            let buttonSize = actionButtonSize(for: safeSize, isLandscape: isLandscape)
             
-            VStack(spacing: 0) { // 垂直排列
-                Spacer()
-                statusHeader.padding(.bottom, 40)    // 顯示標題
-                progressCircle.padding(.bottom, 40)  // 顯示計時圓圈
-                actionControls                       // 顯示操作按鈕
-                Spacer()
-                stepDots                             // 顯示進度小點
-                Spacer()
+            ZStack { // 堆疊層：由下往上蓋
+                backgroundColor.ignoresSafeArea() // 最底層的背景色
+                
+                if isLandscape {
+                    landscapeLayout(circleSize: circleSize, buttonSize: buttonSize)
+                } else {
+                    portraitLayout(circleSize: circleSize, buttonSize: buttonSize)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         #if os(macOS)
         .frame(minWidth: 400, minHeight: 600) // Mac 版視窗大小
@@ -73,6 +75,38 @@ struct WindowInitialSizeConfigurator: NSViewRepresentable {
 #endif
 
 extension ContentView {
+    // 直向排列：保留原本由上至下的閱讀順序，但改用較細 spacing，避免細螢幕被擠爆。
+    private func portraitLayout(circleSize: CGFloat, buttonSize: CGFloat) -> some View {
+        VStack(spacing: 24) {
+            Spacer(minLength: 8)
+            statusHeader
+            progressCircle(size: circleSize)
+            actionControls(buttonSize: buttonSize)
+            stepDots
+            Spacer(minLength: 8)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    // 橫向排列：高度變矮時，改成左右分欄，避免標題、圓圈、按鈕、進度點互相遮住。
+    private func landscapeLayout(circleSize: CGFloat, buttonSize: CGFloat) -> some View {
+        HStack(spacing: 28) {
+            progressCircle(size: circleSize)
+                .frame(maxWidth: .infinity)
+            
+            VStack(spacing: 20) {
+                statusHeader
+                actionControls(buttonSize: buttonSize)
+                stepDots
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 32)
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
     
     // 標題顯示組件
     private var statusHeader: some View {
@@ -89,17 +123,24 @@ extension ContentView {
             Text(manager.currentStep.name)
                 .font(.title2.bold())
                 .foregroundColor(manager.isAlarming ? .red : .primary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+                .multilineTextAlignment(.center)
                 // value 指定動畫只在 isAlarming 改變時觸發，避免所有狀態更新都套動畫。
                 .animation(.easeInOut, value: manager.isAlarming)
         }
+        .frame(maxWidth: .infinity)
     }
     
     // 中間的進度圓圈組件
-    private var progressCircle: some View {
-        ZStack {
+    private func progressCircle(size: CGFloat) -> some View {
+        let lineWidth = max(9, size * 0.06)
+        let timeFontSize = max(34, size * 0.22)
+        
+        return ZStack {
             // 背景灰圈
             Circle()
-                .stroke(Color.gray.opacity(0.1), lineWidth: 15)
+                .stroke(Color.gray.opacity(0.1), lineWidth: lineWidth)
             
             // 彩色進度圈
             Circle()
@@ -107,7 +148,7 @@ extension ContentView {
                 .trim(from: 0, to: manager.timeRemaining / Double(manager.currentStep.seconds))
                 .stroke(
                     manager.isAlarming ? Color.red : manager.currentStep.themeColor,
-                    style: StrokeStyle(lineWidth: 15, lineCap: .round)
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90)) // 起點修正到正上方
                 .animation(.linear(duration: 0.2), value: manager.timeRemaining)
@@ -115,20 +156,22 @@ extension ContentView {
             VStack(spacing: 10) {
                 // 圖示
                 Image(systemName: manager.currentStep.icon)
-                    .font(.largeTitle)
+                    .font(.system(size: max(24, size * 0.14), weight: .regular))
                     .foregroundColor(manager.isAlarming ? .red : manager.currentStep.themeColor)
                 
                 // 時間文字（例如 19:59）
                 Text(timeString(from: Int(ceil(manager.timeRemaining))))
-                    .font(.system(size: 55, weight: .bold, design: .monospaced))
+                    .font(.system(size: timeFontSize, weight: .bold, design: .monospaced))
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
             }
         }
-        .frame(width: 250, height: 250)
+        .frame(width: size, height: size)
     }
     
     // 下方按鈕組件
-    private var actionControls: some View {
-        HStack(spacing: 40) {
+    private func actionControls(buttonSize: CGFloat) -> some View {
+        HStack(spacing: max(24, buttonSize * 0.45)) {
             Button(action: {
                 // 同一顆主按鈕在不同狀態下做不同事：
                 // 響鈴時是「確認並進下一階段」，平常是「開始/暫停」。
@@ -141,11 +184,11 @@ extension ContentView {
                 ZStack {
                     Circle()
                         .fill(mainButtonColor)
-                        .frame(width: 80, height: 80)
+                        .frame(width: buttonSize, height: buttonSize)
                         .shadow(color: mainButtonColor.opacity(0.3), radius: 10, y: 5)
                     
                     Image(systemName: mainButtonIcon)
-                        .font(.title.bold())
+                        .font(.system(size: buttonSize * 0.34, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
@@ -158,15 +201,16 @@ extension ContentView {
                 ZStack {
                     Circle()
                         .fill(Color.gray.opacity(0.1))
-                        .frame(width: 80, height: 80)
+                        .frame(width: buttonSize, height: buttonSize)
                     
                     Image(systemName: "arrow.counterclockwise")
-                        .font(.title2)
+                        .font(.system(size: buttonSize * 0.28, weight: .regular))
                         .foregroundColor(.secondary)
                 }
             }
             .buttonStyle(PlainButtonStyle())
         }
+        .frame(height: buttonSize * 1.2)
     }
     
     // 進度圓點組件
@@ -212,5 +256,22 @@ extension ContentView {
         let m = totalSeconds / 60
         let s = totalSeconds % 60
         return String(format: "%02d:%02d", m, s)
+    }
+    
+    private func progressCircleSize(for size: CGSize, isLandscape: Bool) -> CGFloat {
+        if isLandscape {
+            // 橫向時高度是限制，所以用高度計算，並預留上下 safe area / padding。
+            return min(240, max(150, size.height - 64))
+        } else {
+            return min(250, max(190, size.width * 0.68))
+        }
+    }
+    
+    private func actionButtonSize(for size: CGSize, isLandscape: Bool) -> CGFloat {
+        if isLandscape {
+            return min(72, max(56, size.height * 0.2))
+        } else {
+            return 80
+        }
     }
 }
