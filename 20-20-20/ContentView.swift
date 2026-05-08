@@ -120,7 +120,7 @@ extension ContentView {
                 .padding(.vertical, 4)
                 .background(Capsule().fill(Color.secondary.opacity(0.1)))
             
-            Text(manager.currentStep.name)
+            Text(statusTitle)
                 .font(.title2.bold())
                 .foregroundColor(manager.isAlarming ? .red : .primary)
                 .lineLimit(2)
@@ -239,6 +239,23 @@ extension ContentView {
         // 將顏色邏輯集中在這裡，Button 的 View 宣告就能保持乾淨。
         if manager.isAlarming { return .orange }
         return manager.isRunning ? .red : .blue
+    }
+    
+    // 標題文字會隨狀態改變：
+    // 平常顯示目前階段名稱；倒數完成並響鈴時，改成更明確的「第幾階段完成」提示。
+    private var statusTitle: String {
+        guard manager.isAlarming else { return manager.currentStep.name }
+        
+        switch manager.currentStep {
+        case .work1:
+            return "第一階段完成 🎉"
+        case .eyeCare:
+            return "第二階段完成 💪🏼"
+        case .work2:
+            return "第三階段完成 🎉"
+        case .longRest:
+            return "第四階段完成 💪🏼"
+        }
     }
     
     // 獲取背景色
