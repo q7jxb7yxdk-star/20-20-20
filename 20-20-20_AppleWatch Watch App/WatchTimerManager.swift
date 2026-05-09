@@ -5,7 +5,9 @@ import WatchKit
 
 // MARK: - Apple Watch 倒數核心
 @MainActor
-final class WatchTimerManager: ObservableObject {
+final class WatchTimerManager: NSObject, ObservableObject {
+    static let shared = WatchTimerManager()
+    
     @Published var currentStep: WatchTimerStep = .work1
     @Published var timeRemaining = Double(WatchTimerStep.work1.seconds)
     @Published var isRunning = false
@@ -13,10 +15,11 @@ final class WatchTimerManager: ObservableObject {
     
     private var targetDate: Date?
     private var displayTimer: AnyCancellable?
-    private let scheduledNotificationIdentifier = "202020WatchNotification.scheduled"
-    private let notificationIdentifierPrefix = "202020WatchNotification.alarm"
+    private var alarmSession: WKExtendedRuntimeSession?
+    private var invalidatingAlarmSessions: [WKExtendedRuntimeSession] = []
     
-    init() {
+    private override init() {
+        super.init()
         requestNotificationPermission()
         setupDisplayTimer()
     }
@@ -31,16 +34,17 @@ final class WatchTimerManager: ObservableObject {
     }
     
     func start() {
-        targetDate = Date().addingTimeInterval(timeRemaining)
+        let finishDate = Date().addingTimeInterval(timeRemaining)
+        targetDate = finishDate
         isRunning = true
         isAlarming = false
-        scheduleAlarmNotification()
+        scheduleSmartAlarmSession(at: finishDate)
     }
     
     func pause() {
         isRunning = false
         targetDate = nil
-        cancelScheduledNotification()
+        cancelSmartAlarmSession()
     }
     
     func reset() {
@@ -92,8 +96,45 @@ final class WatchTimerManager: ObservableObject {
         timeRemaining = 0
         targetDate = nil
         WKInterfaceDevice.current().play(.notification)
-        cancelScheduledNotification()
-        deliverAlarmNotificationImmediately()
+    }
+    
+    private func scheduleSmartAlarmSession(at date: Date) {
+        cancelSmartAlarmSession()
+        
+        // Smart alarm extended runtime session 是 watchOS 背景鬧鐘機制。
+        // 它不是本地通知倒數；畫面上仍然只有 app 自己的一個倒數。
+        let session = WKExtendedRuntimeSession()
+        session.delegate = self
+        alarmSession = session
+        print("Watch smart alarm scheduled at \(date)")
+        session.start(at: date)
+    }
+    
+    private func cancelSmartAlarmSession() {
+        guard let alarmSession else { return }
+        print("Watch smart alarm cancelled")
+        invalidatingAlarmSessions.append(alarmSession)
+        alarmSession.invalidate()
+        self.alarmSession = nil
+    }
+    
+    private func triggerAlarmFromSmartAlarmSession(_ session: WKExtendedRuntimeSession) {
+        guard alarmSession === session else { return }
+        
+        if !isAlarming {
+            isRunning = false
+            isAlarming = true
+            timeRemaining = 0
+            targetDate = nil
+        }
+        
+        // 如果 app 在背景，notifyUser 會顯示系統 alarm alert。
+        // 如果 app 在前景，系統主要會播放重複 haptic，由畫面顯示完成狀態。
+        print("Watch smart alarm started; notifying user")
+        session.notifyUser(hapticType: .notification) { nextHapticType in
+            nextHapticType.pointee = .notification
+            return 2
+        }
     }
     
     private func playTapHaptic() {
@@ -112,47 +153,29 @@ final class WatchTimerManager: ObservableObject {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
     }
-    
-    private func deliverAlarmNotificationImmediately() {
-        let center = UNUserNotificationCenter.current()
-        center.delegate = WatchNotificationPresenter.shared
-        
-        let request = UNNotificationRequest(
-            identifier: "\(notificationIdentifierPrefix).\(UUID().uuidString)",
-            content: makeAlarmNotificationContent(),
-            trigger: nil
-        )
-        
-        center.add(request)
+}
+
+extension WatchTimerManager: WKExtendedRuntimeSessionDelegate {
+    nonisolated func extendedRuntimeSessionDidStart(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
+        print("Watch smart alarm session did start")
+        Task { @MainActor in
+            self.triggerAlarmFromSmartAlarmSession(extendedRuntimeSession)
+        }
     }
     
-    private func scheduleAlarmNotification() {
-        let center = UNUserNotificationCenter.current()
-        center.delegate = WatchNotificationPresenter.shared
-        
-        // Watch app 進入背景後，Swift timer 可能會暫停或被系統延後。
-        // 所以開始倒數時就先排一個系統通知，背景時由 watchOS 負責準時提醒。
-        let content = makeAlarmNotificationContent()
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, timeRemaining), repeats: false)
-        let request = UNNotificationRequest(
-            identifier: scheduledNotificationIdentifier,
-            content: content,
-            trigger: trigger
-        )
-        
-        center.removePendingNotificationRequests(withIdentifiers: [scheduledNotificationIdentifier])
-        center.add(request)
+    nonisolated func extendedRuntimeSessionWillExpire(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
+        print("Watch smart alarm session will expire")
+        extendedRuntimeSession.invalidate()
     }
     
-    private func makeAlarmNotificationContent() -> UNMutableNotificationContent {
-        let content = UNMutableNotificationContent()
-        content.title = currentStep.completedTitle
-        content.body = "請打開 20-20-20，點擊橘色打勾進入下一個階段。"
-        content.sound = .default
-        return content
-    }
-    
-    private func cancelScheduledNotification() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [scheduledNotificationIdentifier])
+    nonisolated func extendedRuntimeSession(_ extendedRuntimeSession: WKExtendedRuntimeSession, didInvalidateWith reason: WKExtendedRuntimeSessionInvalidationReason, error: Error?) {
+        print("Watch smart alarm session invalidated: \(reason), error: \(String(describing: error))")
+        Task { @MainActor in
+            if self.alarmSession === extendedRuntimeSession {
+                self.alarmSession = nil
+            }
+            
+            self.invalidatingAlarmSessions.removeAll { $0 === extendedRuntimeSession }
+        }
     }
 }

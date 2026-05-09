@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Apple Watch 主畫面
 struct WatchContentView: View {
-    @StateObject private var manager = WatchTimerManager()
+    @ObservedObject var manager: WatchTimerManager
     
     var body: some View {
         VStack(spacing: 8) {
