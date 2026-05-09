@@ -6,8 +6,6 @@
 
 `20-20-20 護眼助理` 是一個用 SwiftUI 寫成的倒數提醒 App，目的是幫使用者按 20-20-20 護眼法則定時休息眼睛。
 
-20-20-20 的概念是：每工作一段時間後，望向遠處或休息眼睛一小段時間，減少長時間望螢幕帶來的眼睛疲勞。
-
 ### 1.1 主要功能
 
 - 顯示目前倒數階段，例如「專注工作」、「遠眺放鬆」、「深度休息」。
@@ -24,12 +22,12 @@
 
 App 目前有四個階段，由 `TimerStep` 定義：
 
-| 階段 | 名稱 | 用途 |
-| --- | --- | --- |
-| `work1` | 第一階段：專注工作 | 第一段工作時間 |
-| `eyeCare` | 第二階段：遠眺放鬆 | 護眼休息 |
-| `work2` | 第三階段：專注工作 | 第二段工作時間 |
-| `longRest` | 第四階段：深度休息 | 較長休息 |
+| 階段 | 名稱 | 用途 | 時間 | 
+| --- | --- | --- | --- |
+| `work1` | 第一階段：專注工作 | 第一段工作時間 | 20 分鐘 |
+| `eyeCare` | 第二階段：遠眺放鬆 | 護眼休息 | 20 秒 |
+| `work2` | 第三階段：專注工作 | 第二段工作時間 | 20 分鐘 |
+| `longRest` | 第四階段：深度休息 | 較長休息 | 3 分鐘 |
 
 在 `DEBUG` 模式下，時間會被縮短，方便開發時快速測試倒數完成、通知、響鈴等流程。正式版則會使用較接近真實使用情境的時間設定。
 
@@ -47,6 +45,7 @@ App 目前有四個階段，由 `TimerStep` 定義：
 | `NotificationPresenter.swift` | App 在前台時如何顯示通知 |
 | `AlarmKitSupport.swift` | iOS AlarmKit 所需 metadata 和停止鬧鐘 intent |
 | `Settings.bundle/Root.plist` | iOS 系統設定 App 內顯示的 App 設定 |
+| `20-20-20 Watch App/` | Apple Watch 版本 MVP 代碼 |
 
 這樣拆的好處是：畫面、資料、業務邏輯、系統通知、iOS AlarmKit 不會全部塞在同一個檔案。當 App 變大時，這種分工會令閱讀和維護容易好多。
 
@@ -481,6 +480,42 @@ try? AlarmManager.shared.cancel(id: id)
 
 這樣寫可以共用大部分 SwiftUI 畫面和倒數邏輯，同時保留每個平台需要的原生能力。
 
+### 9.1 Apple Watch 版本
+
+Apple Watch 版本目前以獨立 MVP 方式設計，代碼放在：
+
+```text
+20-20-20 Watch App/
+```
+
+主要檔案：
+
+| 檔案 | 責任 |
+| --- | --- |
+| `WatchEyeCareTimerApp.swift` | Watch App 入口 |
+| `WatchContentView.swift` | Watch 主畫面 |
+| `WatchTimerManager.swift` | Watch 倒數核心邏輯 |
+| `WatchTimerStep.swift` | Watch 階段資料和測試時間 |
+
+Watch MVP 的功能：
+
+- 顯示目前階段。
+- 顯示圓形倒數。
+- 支援開始、暫停、重置。
+- 倒數完成後顯示「第 X 階段完成」提示。
+- 使用 Apple Watch haptic 提醒。
+- 點擊確認後進入下一階段。
+
+目前 Watch 版本先不和 iPhone App 同步設定，原因是初版應先確認 Watch 上的倒數體驗和 UI 是否穩定。之後如要同步，可以加入 `WatchConnectivity`，由 iPhone 傳送目前模式、倒數時間或階段狀態到 Watch。
+
+要真正編譯 Watch App，需要在 Xcode 加入 watchOS target：
+
+```text
+File > New > Target > watchOS > Watch App
+```
+
+建立 target 後，再將 `20-20-20 Watch App/` 內的 Swift 檔加入 Watch App target membership。
+
 ## 10. 主要流程總結
 
 ### 10.1 使用者按開始
@@ -526,7 +561,284 @@ try? AlarmManager.shared.cancel(id: id)
 - `AlarmKit`：iOS 系統鬧鐘整合。
 - `NSViewRepresentable`：SwiftUI 和 AppKit 橋接。
 
-## 12. 之後可以優化的方向
+## 12. 專案特色與開發筆記
+
+這一節整理一些專案層面的特色、Xcode 設定、音訊轉檔、安裝方式，以及 Debug Area 常見訊息。部分內容來自開發過程中的筆記，並已按目前版本的代碼修正。
+
+### 12.1 循環邏輯
+
+App 的四個階段會按固定順序循環：
+
+1. 階段一：20 分鐘專注工作。
+2. 階段二：用戶確認後，倒數 20 秒遠眺放鬆。
+3. 階段三：用戶確認後，再倒數 20 分鐘專注工作。
+4. 階段四：用戶確認後，倒數 3 分鐘長休息。
+5. 完成第四階段後，回到第一階段並暫停。
+
+在 `Debug 測試模式` 下，這些時間會縮短成幾秒鐘，方便測試每個階段跳轉、通知、響鈴和 UI 狀態。
+
+### 12.1 響鬧機制
+
+時間到達時，App 會進入「響鬧狀態」：
+
+```swift
+isRunning = false
+isAlarming = true
+timeRemaining = 0
+```
+
+畫面會將主按鈕改成橘色打勾確認按鈕。用戶點擊後，`ContentView` 會呼叫：
+
+```swift
+manager.nextStep()
+```
+
+目前版本的實際做法：
+
+- macOS：使用 `NSSound` 播放專案內的 `alarm.caf`，並發送本地通知。
+- iOS：聲音交由 AlarmKit 處理，App 內不再另外用 `AVAudioPlayer` 播放音效，避免聲音重疊。
+- iOS / macOS：在用戶操作或響鈴時觸發震動 / 觸感回饋。
+
+早期開發筆記中提到「每 2 秒播放一次系統提示音」和 `NSSound.beep()`，但目前代碼已改為更穩定的 `alarm.caf` / AlarmKit 設計。
+
+### 12.2 跨平台優化
+
+macOS：
+
+- 支援隱藏標題列的簡潔視窗。
+- 使用 `WindowInitialSizeConfigurator` 設定初始視窗大小。
+- 使用 `NSSound` 播放提醒聲。
+- 使用 `UserNotifications` 發送本地通知。
+
+iOS：
+
+- 使用 AlarmKit 排程系統鬧鐘。
+- 支援後台提醒與震動。
+- UI 會根據直向 / 橫向自動調整，橫向時改用左右分欄，避免標題、按鈕、進度小點被遮擋。
+- 支援在 `iPhone 設定 > 20-20-20` 切換 Debug / Release 模式。
+
+### 12.3 調試功能
+
+目前版本不是使用 `TimerStep` 裡的 `isDebug` 開關，而是使用 runtime 設定：
+
+```text
+Debug:   work 10s, eyeCare 5s, longRest 8s
+Release: work 20min, eyeCare 20s, longRest 3min
+```
+
+macOS 可以在 App 的 Settings 視窗切換模式。
+
+iOS 可以在系統設定切換：
+
+```text
+iPhone 設定 > 20-20-20 > 模式
+```
+
+這種做法比寫死 `isDebug = true` 更方便，因為不用重新編譯 App 就可以切換測試時間和正式時間。
+
+### 12.4 鬧鐘有效播放設定
+
+如果要測試 iOS 背景提醒和音訊，Xcode target 設定要留意：
+
+```text
+Project navigator
+20-20-20 > TARGETS > 20-20-20 > Signing & Capabilities
+```
+
+Signing：
+
+```text
+Team: Sunny Yu (Personal Team)
+```
+
+Background Modes：
+
+```text
++ Capability > Background Modes
+勾選 Audio, AirPlay, and Picture in Picture
+```
+
+注意：目前 iOS 主要使用 AlarmKit 處理系統鬧鐘聲。如果之後重新加入 App 內背景播放音效，才更需要依賴 Background Audio。這個設定可以保留作測試用途。
+
+### 12.5 一般註解：`//`
+
+一般註解用 `//`：
+
+```swift
+// 這裡用 targetDate 計算剩餘時間，避免 App 進入背景後時間不準。
+```
+
+常見用途：
+
+- 解釋這行程式碼為甚麼要這樣寫。
+- 記錄某段邏輯的原因。
+- 暫時把不想執行的代碼關掉，也就是「註解掉」。
+
+### 12.6 文件註解：`///`
+
+文件註解用 `///`：
+
+```swift
+/// 將秒數轉換成 00:00 格式的時間文字。
+/// - Parameter totalSeconds: 總秒數。
+/// - Returns: 格式化後的分鐘和秒數。
+private func timeString(from totalSeconds: Int) -> String
+```
+
+`///` 適合用來描述：
+
+- 一個功能做甚麼。
+- 變數代表甚麼。
+- 類型的用途。
+- 參數是甚麼。
+- 回傳值是甚麼。
+
+在 Xcode 中，如果你按住 `Option` 並點擊有 `///` 註解的功能，Xcode 會彈出 Quick Help 視窗，顯示你寫的說明。
+
+### 12.7 Convert MP3 to CAF
+
+如果要將 MP3 轉成 CAF，可以用：
+
+```bash
+afconvert -f caff -d ima4 -c 1 input.mp3 alarm.caf
+```
+
+參數意思：
+
+- `-f caff`：輸出 CAF 格式。
+- `-d ima4`：使用 IMA4 壓縮格式。
+- `-c 1`：轉成單聲道。
+- `input.mp3`：原始 MP3。
+- `alarm.caf`：輸出的 CAF 檔案。
+
+### 12.8 Release Mode
+
+如果想在 Xcode 由 Debug 切到 Release：
+
+```text
+Product > Scheme > Edit Scheme
+Run > Info > Build Configuration
+Debug / Release
+```
+
+注意：Xcode 的 Debug / Release build configuration 和 App 內的 `Debug 測試模式` / `Release 正式模式` 是兩件事。
+
+- Xcode Debug / Release：影響編譯優化、符號、發佈方式。
+- App 內 Debug / Release：影響倒數時間長短，方便測試。
+
+### 12.9 安裝 App 到 macOS
+
+macOS 可以透過 Archive 封裝 App：
+
+```text
+Product > Archive > Distribute App > Custom > Copy App
+```
+
+流程意思：
+
+- `Archive`：編譯並封裝 App。
+- `Distribute App`：選擇發佈方式。
+- `Custom > Copy App`：輸出一個可以複製到其他位置的 `.app`。
+
+### 12.10 安裝 App 到 iPhone
+
+開發測試時，可以使用 Xcode 偵錯模式：
+
+```text
+USB 連接 iPhone
+Xcode 選擇實體 iPhone
+按 Run
+```
+
+第一次安裝到實體 iPhone 時，可能需要在 iPhone 上信任開發者帳號。
+
+## 13. Xcode Debug Area 常見訊息
+
+這一節整理開發過程中可能看到的 Xcode Debug Area 訊息。很多都屬於 Apple 系統框架、Simulator 或 sandbox 的 log，不一定代表 App 本身有 bug。
+
+### 13.1 AddInstanceForFactory
+
+```text
+AddInstanceForFactory: No factory registered for id <CFUUID ...> F8BB1C28-BAE8-11D6-9C31-00039315CD46
+```
+
+CoreAudio / AudioToolbox 在初始化音訊元件時找不到某個 factory。常見於 iOS Simulator，或者使用 `AVFoundation`、`AVAudioSession`、`AVAudioPlayer`、通知聲音、系統音效時。
+
+避免 App 啟動時就初始化音訊，可以改成需要播放聲音時才設定音訊相關物件。目前版本已移除 iOS 的 `AVAudioPlayer` 分支，iOS 聲音交由 AlarmKit 處理。
+
+### 13.2 LoudnessManager plist
+
+```text
+LoudnessManager.mm:1755 ReadPListFile: unable to open stream for LoudnessManager plist
+```
+
+Apple 的音訊框架想讀取某個響度 / 聲學設定 plist，但目前環境找不到。這在 iOS Simulator、使用 `AVAudioSession`、`AVAudioPlayer` 或通知聲音時很常見。
+
+通常可以忽略。
+
+### 13.3 DetachedSignatures
+
+```text
+cannot open file at line 51044 of [f0ca7bba1c]
+os_unix.c:51044: (2) open(/private/var/db/DetachedSignatures) - No such file or directory
+```
+
+macOS 系統安全 / 簽章機制嘗試讀取 `/private/var/db/DetachedSignatures`，但該檔案不存在。這不是 App 自己開檔失敗，亦與 `ContentView.swift` 無關。
+
+通常可以忽略。
+
+### 13.4 audioanalyticsd sandbox precondition failure
+
+```text
+PRECONDITION FAILURE: Process is sandboxed but 'com.apple.security.exception.mach-lookup.global-name' doesn't contain 'com.apple.audioanalyticsd'.
+```
+
+macOS App 在 sandbox 裡播放音效時，系統音訊框架嘗試連到 `com.apple.audioanalyticsd`，但 App 的 sandbox entitlements 沒有允許這個 mach service。
+
+早前的處理方式是新增 Debug 專用 entitlements，加入：
+
+```text
+com.apple.security.exception.mach-lookup.global-name
+com.apple.audioanalyticsd
+```
+
+然後在 macOS Debug build 套用這個 entitlements。這類設定通常只適合 Debug 測試，不建議隨便帶到正式發佈版本。
+
+### 13.5 Reporter disconnected
+
+```text
+Reporter disconnected. { function=sendMessage, reporterID=107554571026433 }
+```
+
+通常是音訊分析 reporter 連線失敗或中斷後的後續訊息，和 `audioanalyticsd` 相關。
+
+如果 App 功能正常，可以先忽略。
+
+### 13.6 CoreAnalytics app launch measurements
+
+```text
+Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+```
+
+```text
+Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+```
+
+Apple 的 CoreAnalytics 嘗試送出 App 啟動效能統計失敗。常見於 Xcode Debug / Simulator。這不是 UI 第一幀真的失敗，也通常不是 App 內部 bug。
+
+通常可以忽略。如果只是想令 Debug Area 乾淨，可以考慮在 Xcode Scheme 加環境變數隱藏部分系統 log。
+
+### 13.7 HALC ProxyIOContext overload
+
+```text
+HALC_ProxyIOContext.cpp:1623 HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload
+```
+
+音訊 I/O 某一輪負載過高，常在響鈴、通知、UI 狀態切換同時發生時出現。
+
+如果只是偶爾出現，而且提醒聲和 UI 都正常，可以先觀察。若大量出現，就要檢查是否有重複播放音效、短時間內多次初始化音訊、或同時觸發太多通知 / 音效操作。
+
+## 14. 之後可以優化的方向
 
 以下是將來可以考慮的優化，不一定要馬上做：
 
