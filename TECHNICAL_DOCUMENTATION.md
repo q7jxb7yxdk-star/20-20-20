@@ -496,6 +496,8 @@ Apple Watch 版本目前以獨立 MVP 方式設計，代碼放在：
 | `WatchContentView.swift` | Watch 主畫面 |
 | `WatchTimerManager.swift` | Watch 倒數核心邏輯 |
 | `WatchTimerStep.swift` | Watch 階段資料和測試時間 |
+| `WatchNotificationPresenter.swift` | Watch 前台通知 delegate |
+| `20-20-20-Watch-Info.plist` | Watch App 的 Info.plist，包含背景 alarm mode |
 
 Watch MVP 的功能：
 
@@ -504,9 +506,132 @@ Watch MVP 的功能：
 - 支援開始、暫停、重置。
 - 倒數完成後顯示「第 X 階段完成」提示。
 - 使用 Apple Watch haptic 提醒。
+- 使用 `WKExtendedRuntimeSession` 的 smart alarm 機制，支援背景提醒。
 - 點擊確認後進入下一階段。
 
 目前 Watch 版本先不和 iPhone App 同步設定，原因是初版應先確認 Watch 上的倒數體驗和 UI 是否穩定。之後如要同步，可以加入 `WatchConnectivity`，由 iPhone 傳送目前模式、倒數時間或階段狀態到 Watch。
+
+#### 9.1.1 Watch 背景提醒：Smart Alarm
+
+Apple Watch 版本不能只靠 Swift timer 處理背景提醒。當 Watch App 退到背景後，`Timer.publish` 可能會暫停或延遲，所以背景倒數完成時未必能準時執行普通 Swift 代碼。
+
+目前 Watch 版本使用：
+
+```swift
+WKExtendedRuntimeSession
+```
+
+並在 Watch App 的 Info.plist 加入：
+
+```xml
+<key>WKBackgroundModes</key>
+<array>
+    <string>alarm</string>
+</array>
+```
+
+這個設定放在：
+
+```text
+20-20-20-Watch-Info.plist
+```
+
+不要把 Watch `Info.plist` 放在 `20-20-20_AppleWatch Watch App/` 資料夾內，因為目前 project 使用 Xcode 的 folder-synced target，資料夾內檔案可能會自動加入 Resources，導致 `Info.plist` 被複製兩次，出現 duplicate output error。
+
+倒數開始時，`WatchTimerManager` 會建立 smart alarm session：
+
+```swift
+let session = WKExtendedRuntimeSession()
+session.delegate = self
+session.start(at: finishDate)
+```
+
+當 watchOS 到時間啟動 session 時，delegate 會呼叫：
+
+```swift
+extendedRuntimeSessionDidStart(_:)
+```
+
+之後 App 會執行：
+
+```swift
+session.notifyUser(hapticType: .notification) { nextHapticType in
+    nextHapticType.pointee = .notification
+    return 2
+}
+```
+
+這樣背景時就由 watchOS 的 smart alarm alert / haptic 負責提醒，而不是靠本地通知倒數。
+
+#### 9.1.2 為甚麼不用預先排程本地通知
+
+曾經測試過 `UNTimeIntervalNotificationTrigger`，背景提醒可靠，但會造成兩套倒數：
+
+- App 畫面自己的倒數。
+- 系統 pending notification 的倒數 / 排程。
+
+這不符合目前設計，所以 Watch 版本改用 smart alarm session。它仍然需要向 watchOS 排一個 smart alarm，但不會在使用者介面上產生另一個普通 notification 倒數。
+
+#### 9.1.3 WatchTimerManager 的生命週期
+
+`WKExtendedRuntimeSession` 需要被強引用保存。如果持有它的物件被釋放，Debug Area 可能會出現：
+
+```text
+WKExtendedRuntimeObject was dealloced while scheduled
+```
+
+所以目前 `WatchTimerManager` 使用 singleton：
+
+```swift
+static let shared = WatchTimerManager()
+```
+
+並由 Watch App entry 持有：
+
+```swift
+@StateObject private var manager = WatchTimerManager.shared
+```
+
+`WatchContentView` 只接收：
+
+```swift
+@ObservedObject var manager: WatchTimerManager
+```
+
+這樣可以避免畫面退到背景或被 SwiftUI 重建時，smart alarm session 跟著消失。
+
+#### 9.1.4 測試真 Apple Watch
+
+用真 Apple Watch 測試時，建議流程如下：
+
+1. 確認 iPhone 已經和 Apple Watch 配對。
+2. 用 USB 將 iPhone 連接 Mac，第一次測試用 USB 最穩。
+3. iPhone、Apple Watch、Mac 使用同一 Apple ID 會較少 provisioning 問題。
+4. iPhone 開啟 Developer Mode：
+
+```text
+iPhone Settings > Privacy & Security > Developer Mode
+```
+
+5. Apple Watch 如有 Developer Mode，也要開啟：
+
+```text
+Apple Watch Settings > Privacy & Security > Developer Mode
+```
+
+6. Xcode 左上角選擇真機 iPhone 或 paired Apple Watch destination。
+7. Apple Watch 保持解鎖。
+8. 按 Run，等 Xcode 安裝 App 到 iPhone / Watch。
+9. 在 Watch 上開始倒數。
+10. 按 Digital Crown 回到錶面，測試背景 smart alarm 是否準時提醒。
+
+如果 Xcode 見到 iPhone 但見不到 Apple Watch，可以到：
+
+```text
+Xcode > Window > Devices and Simulators
+```
+
+確認 iPhone 右邊是否顯示 paired Apple Watch。
 
 要真正編譯 Watch App，需要在 Xcode 加入 watchOS target：
 
@@ -563,104 +688,9 @@ File > New > Target > watchOS > Watch App
 
 ## 12. 專案特色與開發筆記
 
-這一節整理一些專案層面的特色、Xcode 設定、音訊轉檔、安裝方式，以及 Debug Area 常見訊息。部分內容來自開發過程中的筆記，並已按目前版本的代碼修正。
+這一節只保留較零散、但開發時常會查閱的筆記。核心功能、平台差異和 Watch 背景提醒已經分別在第 1、5、6、9 章解釋，這裡不再重複。
 
-### 12.1 循環邏輯
-
-App 的四個階段會按固定順序循環：
-
-1. 階段一：20 分鐘專注工作。
-2. 階段二：用戶確認後，倒數 20 秒遠眺放鬆。
-3. 階段三：用戶確認後，再倒數 20 分鐘專注工作。
-4. 階段四：用戶確認後，倒數 3 分鐘長休息。
-5. 完成第四階段後，回到第一階段並暫停。
-
-在 `Debug 測試模式` 下，這些時間會縮短成幾秒鐘，方便測試每個階段跳轉、通知、響鈴和 UI 狀態。
-
-### 12.1 響鬧機制
-
-時間到達時，App 會進入「響鬧狀態」：
-
-```swift
-isRunning = false
-isAlarming = true
-timeRemaining = 0
-```
-
-畫面會將主按鈕改成橘色打勾確認按鈕。用戶點擊後，`ContentView` 會呼叫：
-
-```swift
-manager.nextStep()
-```
-
-目前版本的實際做法：
-
-- macOS：使用 `NSSound` 播放專案內的 `alarm.caf`，並發送本地通知。
-- iOS：聲音交由 AlarmKit 處理，App 內不再另外用 `AVAudioPlayer` 播放音效，避免聲音重疊。
-- iOS / macOS：在用戶操作或響鈴時觸發震動 / 觸感回饋。
-
-早期開發筆記中提到「每 2 秒播放一次系統提示音」和 `NSSound.beep()`，但目前代碼已改為更穩定的 `alarm.caf` / AlarmKit 設計。
-
-### 12.2 跨平台優化
-
-macOS：
-
-- 支援隱藏標題列的簡潔視窗。
-- 使用 `WindowInitialSizeConfigurator` 設定初始視窗大小。
-- 使用 `NSSound` 播放提醒聲。
-- 使用 `UserNotifications` 發送本地通知。
-
-iOS：
-
-- 使用 AlarmKit 排程系統鬧鐘。
-- 支援後台提醒與震動。
-- UI 會根據直向 / 橫向自動調整，橫向時改用左右分欄，避免標題、按鈕、進度小點被遮擋。
-- 支援在 `iPhone 設定 > 20-20-20` 切換 Debug / Release 模式。
-
-### 12.3 調試功能
-
-目前版本不是使用 `TimerStep` 裡的 `isDebug` 開關，而是使用 runtime 設定：
-
-```text
-Debug:   work 10s, eyeCare 5s, longRest 8s
-Release: work 20min, eyeCare 20s, longRest 3min
-```
-
-macOS 可以在 App 的 Settings 視窗切換模式。
-
-iOS 可以在系統設定切換：
-
-```text
-iPhone 設定 > 20-20-20 > 模式
-```
-
-這種做法比寫死 `isDebug = true` 更方便，因為不用重新編譯 App 就可以切換測試時間和正式時間。
-
-### 12.4 鬧鐘有效播放設定
-
-如果要測試 iOS 背景提醒和音訊，Xcode target 設定要留意：
-
-```text
-Project navigator
-20-20-20 > TARGETS > 20-20-20 > Signing & Capabilities
-```
-
-Signing：
-
-```text
-Team: Sunny Yu (Personal Team)
-```
-
-Background Modes：
-
-```text
-+ Capability > Background Modes
-勾選 Audio, AirPlay, and Picture in Picture
-```
-
-注意：目前 iOS 主要使用 AlarmKit 處理系統鬧鐘聲。如果之後重新加入 App 內背景播放音效，才更需要依賴 Background Audio。這個設定可以保留作測試用途。
-
-### 12.5 一般註解：`//`
+### 12.1 一般註解：`//`
 
 一般註解用 `//`：
 
@@ -674,7 +704,7 @@ Background Modes：
 - 記錄某段邏輯的原因。
 - 暫時把不想執行的代碼關掉，也就是「註解掉」。
 
-### 12.6 文件註解：`///`
+### 12.2 文件註解：`///`
 
 文件註解用 `///`：
 
@@ -695,7 +725,7 @@ private func timeString(from totalSeconds: Int) -> String
 
 在 Xcode 中，如果你按住 `Option` 並點擊有 `///` 註解的功能，Xcode 會彈出 Quick Help 視窗，顯示你寫的說明。
 
-### 12.7 Convert MP3 to CAF
+### 12.3 Convert MP3 to CAF
 
 如果要將 MP3 轉成 CAF，可以用：
 
@@ -711,7 +741,7 @@ afconvert -f caff -d ima4 -c 1 input.mp3 alarm.caf
 - `input.mp3`：原始 MP3。
 - `alarm.caf`：輸出的 CAF 檔案。
 
-### 12.8 Release Mode
+### 12.4 Release Mode
 
 如果想在 Xcode 由 Debug 切到 Release：
 
@@ -726,7 +756,7 @@ Debug / Release
 - Xcode Debug / Release：影響編譯優化、符號、發佈方式。
 - App 內 Debug / Release：影響倒數時間長短，方便測試。
 
-### 12.9 安裝 App 到 macOS
+### 12.5 安裝 App 到 macOS
 
 macOS 可以透過 Archive 封裝 App：
 
@@ -740,7 +770,7 @@ Product > Archive > Distribute App > Custom > Copy App
 - `Distribute App`：選擇發佈方式。
 - `Custom > Copy App`：輸出一個可以複製到其他位置的 `.app`。
 
-### 12.10 安裝 App 到 iPhone
+### 12.6 安裝 App 到 iPhone
 
 開發測試時，可以使用 Xcode 偵錯模式：
 
