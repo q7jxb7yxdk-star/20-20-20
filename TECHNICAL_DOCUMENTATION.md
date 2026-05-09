@@ -45,7 +45,7 @@ App 目前有四個階段，由 `TimerStep` 定義：
 | `NotificationPresenter.swift` | App 在前台時如何顯示通知 |
 | `AlarmKitSupport.swift` | iOS AlarmKit 所需 metadata 和停止鬧鐘 intent |
 | `Settings.bundle/Root.plist` | iOS 系統設定 App 內顯示的 App 設定 |
-| `20-20-20 Watch App/` | Apple Watch 版本 MVP 代碼 |
+| `20-20-20_AppleWatch Watch App/` | Apple Watch 版本 MVP 代碼 |
 
 這樣拆的好處是：畫面、資料、業務邏輯、系統通知、iOS AlarmKit 不會全部塞在同一個檔案。當 App 變大時，這種分工會令閱讀和維護容易好多。
 
@@ -485,14 +485,14 @@ try? AlarmManager.shared.cancel(id: id)
 Apple Watch 版本目前以獨立 MVP 方式設計，代碼放在：
 
 ```text
-20-20-20 Watch App/
+20-20-20_AppleWatch Watch App/
 ```
 
 主要檔案：
 
 | 檔案 | 責任 |
 | --- | --- |
-| `WatchEyeCareTimerApp.swift` | Watch App 入口 |
+| `_0_20_20_AppleWatchApp.swift` | Watch App 入口 |
 | `WatchContentView.swift` | Watch 主畫面 |
 | `WatchTimerManager.swift` | Watch 倒數核心邏輯 |
 | `WatchTimerStep.swift` | Watch 階段資料和測試時間 |
@@ -514,7 +514,7 @@ Watch MVP 的功能：
 File > New > Target > watchOS > Watch App
 ```
 
-建立 target 後，再將 `20-20-20 Watch App/` 內的 Swift 檔加入 Watch App target membership。
+建立 target 後，再將 `20-20-20_AppleWatch Watch App/` 內的 Swift 檔加入 Watch App target membership。
 
 ## 10. 主要流程總結
 
