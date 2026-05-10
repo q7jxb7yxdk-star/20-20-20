@@ -55,6 +55,14 @@ final class WatchTimerManager: NSObject, ObservableObject {
         playTapHaptic()
     }
     
+    func stopAlarmAlertAfterOpeningApp() {
+        guard isAlarming else { return }
+        
+        // 用戶點擊 smart alarm 提示回到 App 後，停止 watchOS alarm session。
+        // 這只負責停聲 / 停 haptic，不會自動進入下一階段，避免使用者還未確認就跳走。
+        cancelSmartAlarmSession()
+    }
+    
     func nextStep() {
         let isLastStep = currentStep == .longRest
         isAlarming = false

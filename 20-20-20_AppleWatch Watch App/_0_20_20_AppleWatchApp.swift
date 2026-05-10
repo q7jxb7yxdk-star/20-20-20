@@ -10,6 +10,7 @@ import SwiftUI
 
 @main
 struct _0_20_20_AppleWatch_Watch_AppApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var manager = WatchTimerManager.shared
     
     init() {
@@ -21,6 +22,10 @@ struct _0_20_20_AppleWatch_Watch_AppApp: App {
     var body: some Scene {
         WindowGroup {
             WatchContentView(manager: manager)
+                .onChange(of: scenePhase) { _, newPhase in
+                    guard newPhase == .active else { return }
+                    manager.stopAlarmAlertAfterOpeningApp()
+                }
         }
     }
 }
