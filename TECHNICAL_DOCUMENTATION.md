@@ -508,7 +508,23 @@ try? AlarmManager.shared.cancel(id: id)
 
 這樣寫可以共用大部分 SwiftUI 畫面和倒數邏輯，同時保留每個平台需要的原生能力。
 
-### 9.1 Apple Watch 版本
+### 9.1 三平台計時提醒聲音策略
+
+20-20-20 需要在不同平台處理「倒數完成後提醒使用者」。三個平台的系統限制不同，所以提醒方式也不同：
+
+| 平台 | 前景倒數完 | 背景倒數完 | 自訂鈴聲 |
+| --- | --- | --- | --- |
+| macOS | App 自己播放聲音，例如 `NSSound` / `alarm.caf`，並送出本地通知 | 使用 `UserNotifications` 本地通知；可靠程度受系統通知設定、勿擾模式、睡眠狀態影響 | 可以，但主要適合 App 仍在執行時 |
+| iOS / iPadOS | 使用 AlarmKit 處理系統級提醒 | 使用 AlarmKit，體驗最接近系統 Clock app 的 timer / alarm | 可以，AlarmKit 可指定專案內的 `alarm.caf` |
+| watchOS | 使用 watchOS 系統提示與 haptic，例如 `WKInterfaceDevice.current().play(.notification)` | 使用 smart alarm / extended runtime session 嘗試提醒，由 watchOS 顯示系統 alert / haptic | 不建議；前景與背景播放自訂 `alarm.caf` 都不可靠 |
+
+簡單結論：
+
+- iOS / iPadOS 最適合做真正鬧鐘式提醒，因為有 AlarmKit。
+- macOS 沒有公開的 AlarmKit 或 Clock Timer API，所以使用本地通知加 App 內播放聲音。
+- watchOS 對背景播放聲音限制較多，因此使用系統通知聲與 haptic 比自訂鈴聲可靠。
+
+### 9.2 Apple Watch 版本
 
 Apple Watch 版本目前以獨立 MVP 方式設計，代碼放在：
 
@@ -542,7 +558,7 @@ Watch 版本的功能：
 
 目前 Watch 版本會和 iPhone App 同步 `app_run_mode`。當 iPhone App 回到前景時，它會讀取 `AppConfiguration.runMode`，再透過 `WatchConnectivity` 傳送最新模式到 Apple Watch。
 
-#### 9.1.1 Watch Debug / Release 同步
+#### 9.2.1 Watch Debug / Release 同步
 
 Watch 版目前也有 Debug / Release 架構，但不在 Watch UI 顯示模式切換按鈕。模式儲存在 Watch 自己的 `UserDefaults`：
 
@@ -594,7 +610,7 @@ DefaultsKey.runMode: RunMode.debug.rawValue
 
 注意：`register(defaults:)` 不會覆蓋已存在的 `UserDefaults`。如果 Watch app 之前已安裝過，改預設值後要刪除 Watch app 再重新安裝，才會吃到新預設。若 iPhone 之後再同步模式到 Watch，iPhone 的設定會覆蓋 Watch 本地值。
 
-#### 9.1.2 Watch 背景提醒：Smart Alarm
+#### 9.2.2 Watch 背景提醒：Smart Alarm
 
 Apple Watch 版本不能只靠 Swift timer 處理背景提醒。當 Watch App 退到背景後，`Timer.publish` 可能會暫停或延遲，所以背景倒數完成時未必能準時執行普通 Swift 代碼。
 
@@ -648,7 +664,7 @@ session.notifyUser(hapticType: .notification) { nextHapticType in
 
 Watch 版前景和背景都使用 watchOS 系統預設提示，不再打包或播放自訂 `alarm.caf`。背景 smart alarm 使用 `notifyUser(hapticType:)`，由 watchOS 負責顯示系統 alert / haptic；前景到鐘時則使用 `WKInterfaceDevice.current().play(.notification)`。
 
-#### 9.1.3 為甚麼不用預先排程本地通知
+#### 9.2.3 為甚麼不用預先排程本地通知
 
 曾經測試過 `UNTimeIntervalNotificationTrigger`，背景提醒可靠，但會造成兩套倒數：
 
@@ -657,7 +673,7 @@ Watch 版前景和背景都使用 watchOS 系統預設提示，不再打包或�
 
 這不符合目前設計，所以 Watch 版本改用 smart alarm session。它仍然需要向 watchOS 排一個 smart alarm，但不會在使用者介面上產生另一個普通 notification 倒數。
 
-#### 9.1.4 WatchTimerManager 的生命週期
+#### 9.2.4 WatchTimerManager 的生命週期
 
 `WKExtendedRuntimeSession` 需要被強引用保存。如果持有它的物件被釋放，Debug Area 可能會出現：
 
@@ -685,7 +701,7 @@ static let shared = WatchTimerManager()
 
 這樣可以避免畫面退到背景或被 SwiftUI 重建時，smart alarm session 跟著消失。
 
-#### 9.1.5 測試真 Apple Watch
+#### 9.2.5 測試真 Apple Watch
 
 用真 Apple Watch 測試時，建議流程如下：
 
