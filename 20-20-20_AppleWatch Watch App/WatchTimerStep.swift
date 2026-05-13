@@ -61,9 +61,45 @@ enum WatchTimerStep: Int, CaseIterable {
 }
 
 enum WatchAppConfiguration {
+    enum RunMode: String, CaseIterable, Identifiable {
+        case debug
+        case release
+        
+        var id: String { rawValue }
+        
+        var displayName: String {
+            switch self {
+            case .debug: return "Debug 測試模式"
+            case .release: return "Release 正式模式"
+            }
+        }
+    }
+    
+    enum DefaultsKey {
+        static let runMode = "app_run_mode"
+    }
+    
     typealias DurationConfiguration = (work: Int, eyeCare: Int, longRest: Int)
     
-    // Watch 初版先用短時間，方便你在手錶上測試整個循環。
-    // 確認流程穩定後，可以改成正式時間，或之後同 iPhone 設定同步。
-    static let duration: DurationConfiguration = (work: 10, eyeCare: 5, longRest: 8)
+    static func registerDefaults() {
+        // 簡單版先讓 Watch 自己保存模式，預設使用正式時間。
+        // 測試時如果想改預設，可以暫時把 .release 改成 .debug。
+        UserDefaults.standard.register(defaults: [
+            DefaultsKey.runMode: RunMode.release.rawValue
+        ])
+    }
+    
+    static var runMode: RunMode {
+        let rawValue = UserDefaults.standard.string(forKey: DefaultsKey.runMode)
+        return RunMode(rawValue: rawValue ?? "") ?? .release
+    }
+    
+    static var duration: DurationConfiguration {
+        switch runMode {
+        case .debug:
+            return (work: 10, eyeCare: 5, longRest: 8)
+        case .release:
+            return (work: 20 * 60, eyeCare: 20, longRest: 3 * 60)
+        }
+    }
 }

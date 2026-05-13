@@ -15,13 +15,16 @@ final class WatchTimerManager: NSObject, ObservableObject {
     
     private var targetDate: Date?
     private var displayTimer: AnyCancellable?
+    private var settingsObserver: AnyCancellable?
     private var alarmSession: WKExtendedRuntimeSession?
     private var invalidatingAlarmSessions: [WKExtendedRuntimeSession] = []
     
     private override init() {
         super.init()
+        WatchAppConfiguration.registerDefaults()
         requestNotificationPermission()
         setupDisplayTimer()
+        observeSettingsChanges()
     }
     
     func toggle() {
@@ -84,6 +87,18 @@ final class WatchTimerManager: NSObject, ObservableObject {
         displayTimer = Timer.publish(every: 0.2, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in self?.syncRemainingTime() }
+    }
+    
+    private func observeSettingsChanges() {
+        settingsObserver = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.reloadDurationIfIdle() }
+    }
+    
+    private func reloadDurationIfIdle() {
+        // 如果倒數正在跑或正在響，不中途改時間，避免 targetDate 和 smart alarm session 被改亂。
+        guard !isRunning, !isAlarming else { return }
+        timeRemaining = Double(currentStep.seconds)
     }
     
     private func syncRemainingTime() {

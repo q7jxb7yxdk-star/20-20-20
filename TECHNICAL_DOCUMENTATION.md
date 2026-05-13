@@ -511,7 +511,35 @@ Watch MVP 的功能：
 
 目前 Watch 版本先不和 iPhone App 同步設定，原因是初版應先確認 Watch 上的倒數體驗和 UI 是否穩定。之後如要同步，可以加入 `WatchConnectivity`，由 iPhone 傳送目前模式、倒數時間或階段狀態到 Watch。
 
-#### 9.1.1 Watch 背景提醒：Smart Alarm
+#### 9.1.1 Watch Debug / Release 簡單版
+
+Watch 版目前也有 Debug / Release 架構，但先不在 Watch UI 顯示模式切換按鈕。模式儲存在 Watch 自己的 `UserDefaults`：
+
+```swift
+app_run_mode
+```
+
+預設是 Release：
+
+```swift
+DefaultsKey.runMode: RunMode.release.rawValue
+```
+
+現在如果想臨時測試 Debug，只要在 `WatchTimerStep.swift` 改：
+
+```swift
+DefaultsKey.runMode: RunMode.release.rawValue
+```
+
+成：
+
+```swift
+DefaultsKey.runMode: RunMode.debug.rawValue
+```
+
+注意：`register(defaults:)` 不會覆蓋已存在的 `UserDefaults`。如果 Watch app 之前已安裝過，改預設值後要刪除 Watch app 再重新安裝，才會吃到新預設。
+
+#### 9.1.2 Watch 背景提醒：Smart Alarm
 
 Apple Watch 版本不能只靠 Swift timer 處理背景提醒。當 Watch App 退到背景後，`Timer.publish` 可能會暫停或延遲，所以背景倒數完成時未必能準時執行普通 Swift 代碼。
 
@@ -563,7 +591,7 @@ session.notifyUser(hapticType: .notification) { nextHapticType in
 
 這樣背景時就由 watchOS 的 smart alarm alert / haptic 負責提醒，而不是靠本地通知倒數。
 
-#### 9.1.2 為甚麼不用預先排程本地通知
+#### 9.1.3 為甚麼不用預先排程本地通知
 
 曾經測試過 `UNTimeIntervalNotificationTrigger`，背景提醒可靠，但會造成兩套倒數：
 
@@ -572,7 +600,7 @@ session.notifyUser(hapticType: .notification) { nextHapticType in
 
 這不符合目前設計，所以 Watch 版本改用 smart alarm session。它仍然需要向 watchOS 排一個 smart alarm，但不會在使用者介面上產生另一個普通 notification 倒數。
 
-#### 9.1.3 WatchTimerManager 的生命週期
+#### 9.1.4 WatchTimerManager 的生命週期
 
 `WKExtendedRuntimeSession` 需要被強引用保存。如果持有它的物件被釋放，Debug Area 可能會出現：
 
@@ -600,7 +628,7 @@ static let shared = WatchTimerManager()
 
 這樣可以避免畫面退到背景或被 SwiftUI 重建時，smart alarm session 跟著消失。
 
-#### 9.1.4 測試真 Apple Watch
+#### 9.1.5 測試真 Apple Watch
 
 用真 Apple Watch 測試時，建議流程如下：
 

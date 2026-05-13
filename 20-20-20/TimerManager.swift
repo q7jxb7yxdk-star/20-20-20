@@ -26,6 +26,8 @@ class TimerManager: NSObject, ObservableObject {
     private var displayTimer: AnyCancellable?           // 控制畫面跳動的定時器
     // 用 Set 收集多個訂閱，TimerManager 釋放時這些訂閱也會一起取消。
     private var cancellables = Set<AnyCancellable>()    // 系統清理記憶體用
+    // 記住上一次使用的模式，避免 App 回到前景時因為 UserDefaults 通知而誤把暫停中的倒數重設。
+    private var lastRunMode = AppConfiguration.runMode
     
     #if os(macOS)
     // macOS 沒有使用 AlarmKit，所以仍由 App 內的 NSSound 播放提醒聲。
@@ -127,6 +129,13 @@ class TimerManager: NSObject, ObservableObject {
     }
     
     private func handleConfigurationDidChange() {
+        let newRunMode = AppConfiguration.runMode
+        // UserDefaults.didChangeNotification 有時會在 App 回到前景時觸發，
+        // 即使使用者沒有真正改 Debug / Release 模式。
+        // 所以先比較模式是否真的不同，避免暫停中的倒數被重設成完整時間。
+        guard newRunMode != lastRunMode else { return }
+        lastRunMode = newRunMode
+        
         // 如果倒數正在跑，臨時改時間會令 targetDate 變得不清楚，所以不改動當前倒數。
         // 當計時器停低時，就即時用新模式的秒數更新畫面，方便測試 Debug / Release 切換。
         guard !isRunning, !isAlarming else { return }
