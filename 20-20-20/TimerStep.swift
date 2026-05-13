@@ -104,12 +104,9 @@ enum AppConfiguration {
     
     #if os(iOS)
     // AlarmKit 使用自己的聲音設定型別。
-    // Debug 使用系統預設聲音，避免測試時一直聽到正式鬧鐘聲；Release 才使用專案內的 alarm.caf。
+    // Debug / Release 都使用專案內的 alarm.caf，方便測試時直接確認正式鈴聲是否生效。
     static var alarmKitSound: AlertConfiguration.AlertSound {
-        switch runMode {
-        case .debug: return .default
-        case .release: return .named("alarm.caf")
-        }
+        .named("alarm.caf")
     }
     #endif
 }

@@ -1,8 +1,8 @@
 import SwiftUI
 
 // MARK: - Apple Watch 倒數階段
-// Watch 版本先保持獨立，避免一開始就同 iPhone 版本互相牽連。
-// 之後如果要同步 iPhone 設定，可以再用 WatchConnectivity 將資料傳過來。
+// Watch 有自己一份 UserDefaults；iPhone 前景時會用 WatchConnectivity 同步 app_run_mode 過來。
+// 這樣 Watch 離線時仍可使用上一次同步到的模式。
 enum WatchTimerStep: Int, CaseIterable {
     case work1 = 0
     case eyeCare = 1
@@ -82,8 +82,8 @@ enum WatchAppConfiguration {
     typealias DurationConfiguration = (work: Int, eyeCare: Int, longRest: Int)
     
     static func registerDefaults() {
-        // 簡單版先讓 Watch 自己保存模式，預設使用正式時間。
-        // 測試時如果想改預設，可以暫時把 .release 改成 .debug。
+        // 預設使用正式時間；如果 iPhone 有同步 app_run_mode，這個預設值就會被使用者設定取代。
+        // 測試時如果想完全不靠 iPhone，也可以暫時把 .release 改成 .debug。
         UserDefaults.standard.register(defaults: [
             DefaultsKey.runMode: RunMode.release.rawValue
         ])

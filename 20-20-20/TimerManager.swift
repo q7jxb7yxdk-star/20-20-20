@@ -125,6 +125,12 @@ class TimerManager: NSObject, ObservableObject {
                 self?.handleWillEnterForeground() // 立即重新對時，並在從 Alarm 回來時停止系統鬧鐘
             }
             .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                self?.handleDidBecomeActive()
+            }
+            .store(in: &cancellables)
         #endif
     }
     
@@ -143,7 +149,14 @@ class TimerManager: NSObject, ObservableObject {
     }
     
     #if os(iOS)
+    private func refreshUserDefaultsFromSettingsApp() {
+        // iOS Settings.bundle 是由系統 Settings App 寫入 UserDefaults。
+        // 回到 App 時主動 synchronize，可以更穩定讀到剛剛在「設定」裡選的 Debug / Release。
+        UserDefaults.standard.synchronize()
+    }
+    
     private func handleWillEnterForeground() {
+        refreshUserDefaultsFromSettingsApp()
         if isAlarming || (isRunning && (targetDate?.timeIntervalSinceNow ?? 1) <= 0) {
             stopAlarmKitTimer()
             isRunning = false
@@ -155,6 +168,11 @@ class TimerManager: NSObject, ObservableObject {
             handleConfigurationDidChange()
             syncRemainingTime()
         }
+    }
+    
+    private func handleDidBecomeActive() {
+        refreshUserDefaultsFromSettingsApp()
+        handleConfigurationDidChange()
     }
     #endif
 

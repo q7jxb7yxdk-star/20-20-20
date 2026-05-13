@@ -240,6 +240,14 @@ iPhone 設定 > 20-20-20 > 模式
 
 `TimerManager` 亦監聽 `UserDefaults.didChangeNotification`。如果計時器目前停低，切換模式後會即時更新畫面上的剩餘時間；如果倒數正在跑，App 不會臨時改動當前倒數，避免 targetDate 被中途改亂。
 
+iOS 的 AlarmKit 鈴聲使用專案內的 `alarm.caf`。Debug / Release 都使用同一個鈴聲，方便測試時直接確認正式提醒聲是否生效：
+
+```swift
+static var alarmKitSound: AlertConfiguration.AlertSound {
+    .named("alarm.caf")
+}
+```
+
 ## 6. 核心邏輯：TimerManager.swift
 
 `TimerManager` 是整個 App 的核心大腦。它負責：
@@ -492,7 +500,8 @@ Apple Watch 版本目前以獨立 MVP 方式設計，代碼放在：
 
 | 檔案 | 責任 |
 | --- | --- |
-| `_0_20_20_AppleWatchApp.swift` | Watch App 入口 |
+| `EyeCareTimerApp.swift` | iPhone / macOS App 入口；iOS 端亦包含 `WatchRunModeSync` |
+| `20-20-20_AppleWatchApp.swift` | Watch App 入口；包含 `WatchRunModeReceiver` |
 | `WatchContentView.swift` | Watch 主畫面 |
 | `WatchTimerManager.swift` | Watch 倒數核心邏輯 |
 | `WatchTimerStep.swift` | Watch 階段資料和測試時間 |
@@ -506,26 +515,52 @@ Watch MVP 的功能：
 - 支援開始、暫停、重置。
 - 倒數完成後顯示「第 X 階段完成」提示。
 - 使用 Apple Watch haptic 提醒。
+- Watch 前景和背景都使用 watchOS 系統預設 alert / haptic，不使用自訂鈴聲檔。
 - 使用 `WKExtendedRuntimeSession` 的 smart alarm 機制，支援背景提醒。
 - 點擊確認後進入下一階段。
+- 使用 `WatchConnectivity` 從 iPhone 同步 Debug / Release 模式。
 
-目前 Watch 版本先不和 iPhone App 同步設定，原因是初版應先確認 Watch 上的倒數體驗和 UI 是否穩定。之後如要同步，可以加入 `WatchConnectivity`，由 iPhone 傳送目前模式、倒數時間或階段狀態到 Watch。
+目前 Watch 版本會和 iPhone App 同步 `app_run_mode`。當 iPhone App 回到前景時，它會讀取 `AppConfiguration.runMode`，再透過 `WatchConnectivity` 傳送最新模式到 Apple Watch。
 
-#### 9.1.1 Watch Debug / Release 簡單版
+#### 9.1.1 Watch Debug / Release 同步
 
-Watch 版目前也有 Debug / Release 架構，但先不在 Watch UI 顯示模式切換按鈕。模式儲存在 Watch 自己的 `UserDefaults`：
+Watch 版目前也有 Debug / Release 架構，但不在 Watch UI 顯示模式切換按鈕。模式儲存在 Watch 自己的 `UserDefaults`：
 
 ```swift
 app_run_mode
 ```
 
-預設是 Release：
+iPhone 端同步流程：
+
+```swift
+WatchRunModeSync.shared.syncCurrentRunModeToWatch()
+```
+
+它會傳送：
+
+```swift
+[AppConfiguration.DefaultsKey.runMode: AppConfiguration.runMode.rawValue]
+```
+
+Watch 端接收後會寫入自己的 `UserDefaults`：
+
+```swift
+UserDefaults.standard.set(rawValue, forKey: WatchAppConfiguration.DefaultsKey.runMode)
+```
+
+如果 Watch 倒數未開始、也未響鈴，會立即刷新畫面時間：
+
+```swift
+WatchTimerManager.shared.reloadDurationIfIdle()
+```
+
+Watch 本地預設仍然是 Release：
 
 ```swift
 DefaultsKey.runMode: RunMode.release.rawValue
 ```
 
-現在如果想臨時測試 Debug，只要在 `WatchTimerStep.swift` 改：
+如果想臨時測試 Debug，又暫時不靠 iPhone 同步，可以在 `WatchTimerStep.swift` 改：
 
 ```swift
 DefaultsKey.runMode: RunMode.release.rawValue
@@ -537,7 +572,7 @@ DefaultsKey.runMode: RunMode.release.rawValue
 DefaultsKey.runMode: RunMode.debug.rawValue
 ```
 
-注意：`register(defaults:)` 不會覆蓋已存在的 `UserDefaults`。如果 Watch app 之前已安裝過，改預設值後要刪除 Watch app 再重新安裝，才會吃到新預設。
+注意：`register(defaults:)` 不會覆蓋已存在的 `UserDefaults`。如果 Watch app 之前已安裝過，改預設值後要刪除 Watch app 再重新安裝，才會吃到新預設。若 iPhone 之後再同步模式到 Watch，iPhone 的設定會覆蓋 Watch 本地值。
 
 #### 9.1.2 Watch 背景提醒：Smart Alarm
 
@@ -590,6 +625,8 @@ session.notifyUser(hapticType: .notification) { nextHapticType in
 ```
 
 這樣背景時就由 watchOS 的 smart alarm alert / haptic 負責提醒，而不是靠本地通知倒數。
+
+Watch 版前景和背景都使用 watchOS 系統預設提示，不再打包或播放自訂 `alarm.caf`。背景 smart alarm 使用 `notifyUser(hapticType:)`，由 watchOS 負責顯示系統 alert / haptic；前景到鐘時則使用 `WKInterfaceDevice.current().play(.notification)`。
 
 #### 9.1.3 為甚麼不用預先排程本地通知
 

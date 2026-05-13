@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		96B60C772FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 96B60C6D2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		96B60C772FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 96B60C6D2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -145,7 +145,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2640;
-				LastUpgradeCheck = 2640;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					9662EDEC2FA660E600A2C2E2 = {
 						CreatedOnToolsVersion = 26.4.1;
@@ -212,6 +212,7 @@
 /* Begin PBXTargetDependency section */
 		96B60C762FAF357E00E0B0D5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = 96B60C6C2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App */;
 			targetProxy = 96B60C752FAF357E00E0B0D5 /* PBXContainerItemProxy */;
 		};
@@ -252,6 +253,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = WX793X49GJ;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -275,6 +277,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -314,6 +317,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = WX793X49GJ;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -330,6 +334,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -342,6 +347,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "20-20-20/20-20-20-Debug.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 202605081936;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = WX793X49GJ;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -400,6 +406,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 202605081936;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = WX793X49GJ;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -461,11 +468,11 @@
 				DEVELOPMENT_TEAM = WX793X49GJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "20-20-20-Watch-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "20-20-20_AppleWatch";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKBackgroundModes = alarm;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.sunny.eyecaretimer;
-				INFOPLIST_FILE = "20-20-20-Watch-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -496,11 +503,11 @@
 				DEVELOPMENT_TEAM = WX793X49GJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "20-20-20-Watch-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "20-20-20_AppleWatch";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKBackgroundModes = alarm;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.sunny.eyecaretimer;
-				INFOPLIST_FILE = "20-20-20-Watch-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

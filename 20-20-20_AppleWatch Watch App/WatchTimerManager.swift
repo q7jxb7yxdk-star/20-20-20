@@ -95,7 +95,7 @@ final class WatchTimerManager: NSObject, ObservableObject {
             .sink { [weak self] _ in self?.reloadDurationIfIdle() }
     }
     
-    private func reloadDurationIfIdle() {
+    func reloadDurationIfIdle() {
         // 如果倒數正在跑或正在響，不中途改時間，避免 targetDate 和 smart alarm session 被改亂。
         guard !isRunning, !isAlarming else { return }
         timeRemaining = Double(currentStep.seconds)
@@ -150,9 +150,10 @@ final class WatchTimerManager: NSObject, ObservableObject {
             timeRemaining = 0
             targetDate = nil
         }
+        WKInterfaceDevice.current().play(.notification)
         
-        // 如果 app 在背景，notifyUser 會顯示系統 alarm alert。
-        // 如果 app 在前景，系統主要會播放重複 haptic，由畫面顯示完成狀態。
+        // 如果 app 在背景，notifyUser 會顯示 watchOS 系統 alarm alert / haptic。
+        // Watch 版不使用自訂鈴聲，避免背景音訊被系統拒絕。
         print("Watch smart alarm started; notifying user")
         session.notifyUser(hapticType: .notification) { nextHapticType in
             nextHapticType.pointee = .notification
