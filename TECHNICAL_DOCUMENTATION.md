@@ -29,7 +29,7 @@ App 目前有四個階段，由 `TimerStep` 定義：
 | `work2` | 第三階段：專注工作 | 第二段工作時間 | 20 分鐘 |
 | `longRest` | 第四階段：深度休息 | 較長休息 | 3 分鐘 |
 
-在 `DEBUG` 模式下，時間會被縮短，方便開發時快速測試倒數完成、通知、響鈴等流程。正式版則會使用較接近真實使用情境的時間設定。
+在 App 內的 `Debug 測試模式` 下，時間會被縮短，方便開發時快速測試倒數完成、通知、響鈴等流程。`Release 正式模式` 則會使用真實護眼時間。這裡的 Debug / Release 是 App 自己的模式，不等同於 Xcode 的 build configuration。
 
 ## 2. 專案檔案分工
 
@@ -56,14 +56,32 @@ App 的起點在 `EyeCareTimerApp.swift`：
 ```swift
 @main
 struct EyeCareTimerApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+    
     init() {
+        AppConfiguration.registerDefaults()
+        #if os(iOS)
+        WatchRunModeSync.shared.activate()
+        #endif
         UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
     }
     
     var body: some Scene {
         WindowGroup {
             ContentView()
+                #if os(iOS)
+                .onChange(of: scenePhase) { _, newPhase in
+                    guard newPhase == .active else { return }
+                    WatchRunModeSync.shared.syncCurrentRunModeToWatch()
+                }
+                #endif
         }
+        #if os(macOS)
+        .windowStyle(.hiddenTitleBar)
+        Settings {
+            SettingsView()
+        }
+        #endif
     }
 }
 ```
@@ -71,6 +89,8 @@ struct EyeCareTimerApp: App {
 重點：
 
 - `@main` 表示這個 struct 是整個 App 的入口。
+- `AppConfiguration.registerDefaults()` 註冊 Debug / Release 模式的預設值。
+- iOS 會啟動 `WatchRunModeSync`，把目前模式同步到 Apple Watch。
 - `WindowGroup` 建立 App 的第一個視窗。
 - `ContentView()` 是第一個顯示出來的 SwiftUI 畫面。
 - `UNUserNotificationCenter.current().delegate = NotificationPresenter.shared` 用來指定通知代理，讓 App 在前台時都可以決定如何呈現通知。
@@ -81,7 +101,7 @@ struct EyeCareTimerApp: App {
 .windowStyle(.hiddenTitleBar)
 ```
 
-這會令 macOS 視窗隱藏標題列，介面看起來更簡潔。
+這會令 macOS 視窗隱藏標題列，介面看起來更簡潔。macOS 亦有 `SettingsView`，用來切換 App 內的 Debug / Release 模式。
 
 ## 4. 畫面層：ContentView.swift
 
@@ -496,11 +516,11 @@ Apple Watch 版本目前以獨立 MVP 方式設計，代碼放在：
 20-20-20_AppleWatch Watch App/
 ```
 
-主要檔案：
+相關主要檔案：
 
 | 檔案 | 責任 |
 | --- | --- |
-| `EyeCareTimerApp.swift` | iPhone / macOS App 入口；iOS 端亦包含 `WatchRunModeSync` |
+| `EyeCareTimerApp.swift` | iPhone / macOS App 入口；iOS 端包含 `WatchRunModeSync`，負責同步模式到 Watch |
 | `20-20-20_AppleWatchApp.swift` | Watch App 入口；包含 `WatchRunModeReceiver` |
 | `WatchContentView.swift` | Watch 主畫面 |
 | `WatchTimerManager.swift` | Watch 倒數核心邏輯 |
@@ -508,7 +528,7 @@ Apple Watch 版本目前以獨立 MVP 方式設計，代碼放在：
 | `WatchNotificationPresenter.swift` | Watch 前台通知 delegate |
 | `20-20-20-Watch-Info.plist` | Watch App 的 Info.plist，包含背景 alarm mode |
 
-Watch MVP 的功能：
+Watch 版本的功能：
 
 - 顯示目前階段。
 - 顯示圓形倒數。
@@ -698,14 +718,6 @@ Xcode > Window > Devices and Simulators
 
 確認 iPhone 右邊是否顯示 paired Apple Watch。
 
-要真正編譯 Watch App，需要在 Xcode 加入 watchOS target：
-
-```text
-File > New > Target > watchOS > Watch App
-```
-
-建立 target 後，再將 `20-20-20_AppleWatch Watch App/` 內的 Swift 檔加入 Watch App target membership。
-
 ## 10. 主要流程總結
 
 ### 10.1 使用者按開始
@@ -849,99 +861,26 @@ Xcode 選擇實體 iPhone
 
 ## 13. Xcode Debug Area 常見訊息
 
-這一節整理開發過程中可能看到的 Xcode Debug Area 訊息。很多都屬於 Apple 系統框架、Simulator 或 sandbox 的 log，不一定代表 App 本身有 bug。
+很多 Debug Area 訊息都來自 Apple 系統框架、Simulator 或 sandbox，不一定代表 App 本身有 bug。可以用以下原則判斷：
 
-### 13.1 AddInstanceForFactory
+| 訊息關鍵字 | 常見意思 | 是否要處理 |
+| --- | --- | --- |
+| `AddInstanceForFactory` / `LoudnessManager` | CoreAudio / AudioToolbox 的系統音訊 log | 如果提醒聲正常，通常可忽略 |
+| `DetachedSignatures` | macOS 簽章 / 系統安全資料不存在 | 通常可忽略 |
+| `audioanalyticsd` / `Reporter disconnected` | macOS sandbox 內音訊分析服務連線失敗 | Debug 時可忽略；不要隨便把例外 entitlement 帶到正式版 |
+| `Failed to send CA Event` | CoreAnalytics 啟動效能統計送出失敗 | 通常可忽略 |
+| `HALC_ProxyIOContext ... overload` | 音訊 I/O 某一輪負載高 | 偶爾出現可觀察；大量出現才檢查是否重複播放音效 |
 
-```text
-AddInstanceForFactory: No factory registered for id <CFUUID ...> F8BB1C28-BAE8-11D6-9C31-00039315CD46
-```
-
-CoreAudio / AudioToolbox 在初始化音訊元件時找不到某個 factory。常見於 iOS Simulator，或者使用 `AVFoundation`、`AVAudioSession`、`AVAudioPlayer`、通知聲音、系統音效時。
-
-避免 App 啟動時就初始化音訊，可以改成需要播放聲音時才設定音訊相關物件。目前版本已移除 iOS 的 `AVAudioPlayer` 分支，iOS 聲音交由 AlarmKit 處理。
-
-### 13.2 LoudnessManager plist
-
-```text
-LoudnessManager.mm:1755 ReadPListFile: unable to open stream for LoudnessManager plist
-```
-
-Apple 的音訊框架想讀取某個響度 / 聲學設定 plist，但目前環境找不到。這在 iOS Simulator、使用 `AVAudioSession`、`AVAudioPlayer` 或通知聲音時很常見。
-
-通常可以忽略。
-
-### 13.3 DetachedSignatures
-
-```text
-cannot open file at line 51044 of [f0ca7bba1c]
-os_unix.c:51044: (2) open(/private/var/db/DetachedSignatures) - No such file or directory
-```
-
-macOS 系統安全 / 簽章機制嘗試讀取 `/private/var/db/DetachedSignatures`，但該檔案不存在。這不是 App 自己開檔失敗，亦與 `ContentView.swift` 無關。
-
-通常可以忽略。
-
-### 13.4 audioanalyticsd sandbox precondition failure
-
-```text
-PRECONDITION FAILURE: Process is sandboxed but 'com.apple.security.exception.mach-lookup.global-name' doesn't contain 'com.apple.audioanalyticsd'.
-```
-
-macOS App 在 sandbox 裡播放音效時，系統音訊框架嘗試連到 `com.apple.audioanalyticsd`，但 App 的 sandbox entitlements 沒有允許這個 mach service。
-
-早前的處理方式是新增 Debug 專用 entitlements，加入：
-
-```text
-com.apple.security.exception.mach-lookup.global-name
-com.apple.audioanalyticsd
-```
-
-然後在 macOS Debug build 套用這個 entitlements。這類設定通常只適合 Debug 測試，不建議隨便帶到正式發佈版本。
-
-### 13.5 Reporter disconnected
-
-```text
-Reporter disconnected. { function=sendMessage, reporterID=107554571026433 }
-```
-
-通常是音訊分析 reporter 連線失敗或中斷後的後續訊息，和 `audioanalyticsd` 相關。
-
-如果 App 功能正常，可以先忽略。
-
-### 13.6 CoreAnalytics app launch measurements
-
-```text
-Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
-```
-
-```text
-Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
-```
-
-Apple 的 CoreAnalytics 嘗試送出 App 啟動效能統計失敗。常見於 Xcode Debug / Simulator。這不是 UI 第一幀真的失敗，也通常不是 App 內部 bug。
-
-通常可以忽略。如果只是想令 Debug Area 乾淨，可以考慮在 Xcode Scheme 加環境變數隱藏部分系統 log。
-
-### 13.7 HALC ProxyIOContext overload
-
-```text
-HALC_ProxyIOContext.cpp:1623 HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload
-```
-
-音訊 I/O 某一輪負載過高，常在響鈴、通知、UI 狀態切換同時發生時出現。
-
-如果只是偶爾出現，而且提醒聲和 UI 都正常，可以先觀察。若大量出現，就要檢查是否有重複播放音效、短時間內多次初始化音訊、或同時觸發太多通知 / 音效操作。
+如果 App 功能正常，以上訊息多數不用修。真正需要優先處理的是會影響使用者功能的錯誤，例如通知不出現、AlarmKit 無法排程、Watch smart alarm 無法啟動、或 App crash。
 
 ## 14. 之後可以優化的方向
 
 以下是將來可以考慮的優化，不一定要馬上做：
 
 - 將倒數時間改成使用者可自訂。
-- 加入設定頁面，例如聲音、通知、是否自動開始下一階段。
+- 擴充設定頁面，例如聲音、通知、是否自動開始下一階段。
 - 將 `TimerManager` 的通知邏輯再拆成獨立 service。
 - 為 `TimerStep` 和倒數流程加 unit tests。
-- 儲存使用者上次設定，例如用 `UserDefaults`。
 - 加入狀態恢復，App 重開後可以知道上次倒數是否仍然有效。
 
 目前的架構已經比單一巨大 `ContentView.swift` 清楚好多，下一步如果 App 繼續變大，最值得拆的是 `TimerManager` 入面的通知 / AlarmKit / 音效部分。
