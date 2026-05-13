@@ -150,13 +150,24 @@ class TimerManager: NSObject, ObservableObject {
     
     #if os(iOS)
     private func refreshUserDefaultsFromSettingsApp() {
-        // iOS Settings.bundle 是由系統 Settings App 寫入 UserDefaults。
-        // 回到 App 時主動 synchronize，可以更穩定讀到剛剛在「設定」裡選的 Debug / Release。
-        UserDefaults.standard.synchronize()
+        AppConfiguration.refreshFromSettingsApp()
+    }
+    
+    private func refreshConfigurationAfterReturningFromSettings() {
+        refreshUserDefaultsFromSettingsApp()
+        handleConfigurationDidChange()
+        
+        // iOS Settings 有時在 App 剛回到前景的一刻仍未完全把新值 flush 好。
+        // 延遲少少再讀一次，可以避免「第一次返回不生效，要再入設定改一次」的情況。
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            refreshUserDefaultsFromSettingsApp()
+            handleConfigurationDidChange()
+        }
     }
     
     private func handleWillEnterForeground() {
-        refreshUserDefaultsFromSettingsApp()
+        refreshConfigurationAfterReturningFromSettings()
         if isAlarming || (isRunning && (targetDate?.timeIntervalSinceNow ?? 1) <= 0) {
             stopAlarmKitTimer()
             isRunning = false
@@ -165,14 +176,12 @@ class TimerManager: NSObject, ObservableObject {
             targetDate = nil
             triggerHaptic()
         } else {
-            handleConfigurationDidChange()
             syncRemainingTime()
         }
     }
     
     private func handleDidBecomeActive() {
-        refreshUserDefaultsFromSettingsApp()
-        handleConfigurationDidChange()
+        refreshConfigurationAfterReturningFromSettings()
     }
     #endif
 

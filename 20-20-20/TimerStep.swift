@@ -90,6 +90,14 @@ enum AppConfiguration {
         return RunMode(rawValue: rawValue ?? "") ?? .release
     }
     
+    #if os(iOS)
+    static func refreshFromSettingsApp() {
+        // iOS 的 Settings.bundle 是另一個系統 App 幫我們寫 UserDefaults。
+        // 使用者由「設定」返回本 App 時，主動同步一次，避免讀到舊 cache。
+        UserDefaults.standard.synchronize()
+    }
+    #endif
+    
     // 每個階段的持續時間設定（秒）
     static var duration: DurationConfiguration {
         switch runMode {

@@ -26,6 +26,7 @@ struct EyeCareTimerApp: App {
                 #if os(iOS)
                 .onChange(of: scenePhase) { _, newPhase in
                     guard newPhase == .active else { return }
+                    AppConfiguration.refreshFromSettingsApp()
                     // iPhone App 回到前景時，把目前 Debug / Release 模式同步到 Apple Watch。
                     WatchRunModeSync.shared.syncCurrentRunModeToWatch()
                 }
