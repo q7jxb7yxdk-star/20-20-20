@@ -54,7 +54,6 @@ class TimerManager: NSObject, ObservableObject {
     
     override init() {
         super.init()
-        UNUserNotificationCenter.current().delegate = NotificationPresenter.shared // 讓常駐物件處理通知彈窗
         setupDisplayTimer()       // 啟動 0.2 秒一次的畫面更新機制
         setupLifecycleObservers() // 監聽 App 進入背景或回到前台
         #if os(iOS)
@@ -401,9 +400,9 @@ class TimerManager: NSObject, ObservableObject {
     
     private func cancelAlarmKitTimer() {
         guard let id = scheduledAlarmID else { return }
+        scheduledAlarmID = nil
         do {
             try alarmManager.cancel(id: id)
-            scheduledAlarmID = nil
         } catch {
             print("AlarmKit timer 取消失敗: \(error)")
         }
@@ -411,12 +410,16 @@ class TimerManager: NSObject, ObservableObject {
     
     private func stopAlarmKitTimer() {
         guard let id = scheduledAlarmID else { return }
+        scheduledAlarmID = nil
         do {
             try alarmManager.stop(id: id)
-            scheduledAlarmID = nil
         } catch {
-            cancelAlarmKitTimer()
             print("AlarmKit timer 停止失敗，已改用取消: \(error)")
+            do {
+                try alarmManager.cancel(id: id)
+            } catch {
+                print("AlarmKit timer 取消也失敗: \(error)")
+            }
         }
     }
     

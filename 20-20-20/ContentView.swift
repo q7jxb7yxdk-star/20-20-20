@@ -145,7 +145,7 @@ extension ContentView {
             // 彩色進度圈
             Circle()
                 // trim 只畫出圓的一部分；剩餘秒數越少，彩色弧線越短。
-                .trim(from: 0, to: manager.timeRemaining / Double(manager.currentStep.seconds))
+                .trim(from: 0, to: progress)
                 .stroke(
                     manager.isAlarming ? Color.red : manager.currentStep.themeColor,
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
@@ -239,6 +239,12 @@ extension ContentView {
         // 將顏色邏輯集中在這裡，Button 的 View 宣告就能保持乾淨。
         if manager.isAlarming { return .orange }
         return manager.isRunning ? .red : .blue
+    }
+    
+    private var progress: Double {
+        let totalSeconds = manager.currentStep.seconds
+        guard totalSeconds > 0 else { return 0 }
+        return max(0, min(1, manager.timeRemaining / Double(totalSeconds)))
     }
     
     // 標題文字會隨狀態改變：
