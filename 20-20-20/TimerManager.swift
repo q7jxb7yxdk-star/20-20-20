@@ -47,6 +47,9 @@ class TimerManager: NSObject, ObservableObject {
     private var alarmSchedulingToken = UUID()
     // 保存監聽 AlarmKit 更新的 Task，之後如需重新監聽或物件釋放時可以取消。
     private var alarmUpdatesTask: Task<Void, Never>?
+    // iOS 從 Settings App 回來時會連續收到 willEnterForeground / didBecomeActive。
+    // 保存延遲刷新 Task，讓新事件可以取消舊事件，避免短時間內重複刷新多次。
+    private var settingsRefreshTask: Task<Void, Never>?
     #endif
     
     override init() {
@@ -157,10 +160,12 @@ class TimerManager: NSObject, ObservableObject {
         refreshUserDefaultsFromSettingsApp()
         handleConfigurationDidChange()
         
+        settingsRefreshTask?.cancel()
         // iOS Settings 有時在 App 剛回到前景的一刻仍未完全把新值 flush 好。
         // 延遲少少再讀一次，可以避免「第一次返回不生效，要再入設定改一次」的情況。
-        Task { @MainActor in
+        settingsRefreshTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
             refreshUserDefaultsFromSettingsApp()
             handleConfigurationDidChange()
         }

@@ -114,6 +114,10 @@ final class WatchTimerManager: NSObject, ObservableObject {
     
     private func triggerAlarm() {
         guard !isAlarming else { return }
+        
+        // 如果 App 前景自己倒數到零，就不再需要原本排好的 smart alarm session。
+        // 先取消它，可以避免 watchOS session 稍後再啟動一次，造成雙重提醒。
+        cancelSmartAlarmSession()
         isRunning = false
         isAlarming = true
         timeRemaining = 0
