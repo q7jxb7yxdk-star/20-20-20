@@ -30,6 +30,7 @@
 				96B60C772FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
+			platformFilter = ios;
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
