@@ -1,5 +1,9 @@
 @preconcurrency import UserNotifications
 
+extension Notification.Name {
+    static let alarmNotificationWasOpened = Notification.Name("alarmNotificationWasOpened")
+}
+
 // MARK: - 通知呈現代理
 final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     // 使用 singleton，確保整個 App 只有一個通知代理物件。
@@ -25,5 +29,14 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
             completionHandler([.alert])
         }
         #endif
+    }
+    
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        #if os(macOS)
+        // macOS 通知被點擊後，通知 delegate 未必知道 TimerManager 是哪一個實例。
+        // 用 App 內部通知廣播出去，讓 TimerManager 自己決定如何停止鈴聲。
+        NotificationCenter.default.post(name: .alarmNotificationWasOpened, object: nil)
+        #endif
+        completionHandler()
     }
 }

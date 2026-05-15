@@ -121,6 +121,16 @@ class TimerManager: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
         
+        #if os(macOS)
+        NotificationCenter.default.publisher(for: .alarmNotificationWasOpened)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                // 用戶點擊通知通常代表已經留意到提醒；先停聲，仍保留畫面上的確認按鈕。
+                self?.stopAlarmSound()
+            }
+            .store(in: &cancellables)
+        #endif
+        
         #if os(iOS)
         NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
             .sink { [weak self] _ in
