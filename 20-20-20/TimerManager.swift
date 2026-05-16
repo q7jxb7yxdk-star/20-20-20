@@ -307,9 +307,6 @@ class TimerManager: NSObject, ObservableObject {
         isAlarming = false
         stopScheduledAlarm()
         stopAlarmSound()
-        #if os(iOS)
-        EyeCareLiveActivityManager.shared.end()
-        #endif
         
         let allSteps = TimerStep.allCases
         // rawValue + 1 代表往下一階段；% allSteps.count 讓最後一階段之後回到第一階段。
