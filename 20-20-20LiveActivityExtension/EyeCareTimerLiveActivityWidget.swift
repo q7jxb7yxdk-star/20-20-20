@@ -92,8 +92,8 @@ private struct LiveActivityLockScreenView: View {
         HStack(spacing: 12) {
             HStack(spacing: 10) {
                 liveActivityIconLink(
-                    systemName: "pause.fill",
-                    url: pauseURL,
+                    systemName: startPauseSystemName,
+                    url: toggleURL,
                     foreground: .orange,
                     background: .orange.opacity(0.34)
                 )
@@ -148,6 +148,13 @@ private struct LiveActivityLockScreenView: View {
             .frame(minWidth: 118, alignment: .trailing)
             .foregroundStyle(.orange)
     }
+    
+    private var startPauseSystemName: String {
+        // Live Activity 左邊主按鈕：
+        // - 倒數中：顯示 pause，按下會暫停。
+        // - 已暫停或時間到：顯示 play，按下會開始 / 進入下一階段。
+        state.isRunning ? "pause.fill" : "play.fill"
+    }
 }
 
 // MARK: - Dynamic Island UI
@@ -191,8 +198,8 @@ private struct LiveActivityExpandedView: View {
 
 // MARK: - URL Actions
 
-private var pauseURL: URL {
-    URL(string: "eyecaretimer://live-activity/pause")!
+private var toggleURL: URL {
+    URL(string: "eyecaretimer://live-activity/toggle")!
 }
 
 private var resetURL: URL {

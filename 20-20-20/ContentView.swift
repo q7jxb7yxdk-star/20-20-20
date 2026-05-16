@@ -308,9 +308,11 @@ extension ContentView {
         guard url.scheme == "eyecaretimer", url.host == "live-activity" else { return }
         
         switch url.lastPathComponent {
+        case "toggle":
+            manager.toggleOrAdvanceFromLiveActivity()
         case "pause":
-            guard manager.isRunning else { return }
-            manager.pause()
+            // 舊版 Live Activity 曾經使用 pause URL；保留這條路徑，避免系統暫存舊 widget 時按鈕失效。
+            manager.toggleOrAdvanceFromLiveActivity()
         case "reset":
             manager.reset()
         default:

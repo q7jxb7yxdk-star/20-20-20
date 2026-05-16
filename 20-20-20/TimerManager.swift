@@ -214,6 +214,16 @@ class TimerManager: NSObject, ObservableObject {
         if isRunning { pause() } else { start() }
         triggerHaptic() // 點擊時的手感反饋
     }
+    
+    // Live Activity 上的「開始/暫停」按鈕使用這個入口。
+    // 和普通 toggle 不同：如果目前是響鈴 / 階段完成狀態，按一下代表「確認並進入下一階段」。
+    func toggleOrAdvanceFromLiveActivity() {
+        if isAlarming {
+            nextStep()
+        } else {
+            toggle()
+        }
+    }
 
     // 開始計時：紀錄未來的結束時間點並預約系統通知
     func start() {
