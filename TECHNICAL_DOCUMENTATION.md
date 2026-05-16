@@ -534,6 +534,8 @@ iOS 版本加入了 Live Activity，目標是讓使用者在 Lock Screen 和 Dyn
 | --- | --- |
 | `EyeCareTimerLiveActivity.swift` | App 內建立、更新、結束 Live Activity |
 | `EyeCareTimerLiveActivityWidget.swift` | Live Activity extension 的 Lock Screen / Dynamic Island UI |
+| `20-20-20/EyeCareLiveActivityIntents.swift` | iOS App target 內的 Live Activity 互動按鈕動作 |
+| `20-20-20LiveActivityExtension/EyeCareLiveActivityIntents.swift` | Widget extension target 內同名互動按鈕型別，供 Live Activity UI 編譯使用 |
 
 目前顯示方式：
 
@@ -554,6 +556,53 @@ iOS 版本加入了 Live Activity，目標是讓使用者在 Lock Screen 和 Dyn
 因此目前採用比較清楚可靠的設計：Lock Screen 和 Dynamic Island 都直接顯示完整秒鐘倒數，避免使用者以為倒數沒有更新。
 
 注意：在 iOS Simulator 測試 Live Activity 時，系統的 Lock Screen / SpringBoard 行為可能和真機不同。如果 Simulator 在倒數歸零附近出現 SpringBoard crash，應優先用真機確認，因為實機行為通常較準確。
+
+#### 9.2.1 Live Activity 互動按鈕
+
+Lock Screen Live Activity 左側有兩個按鈕：
+
+- 開始 / 暫停按鈕：倒數中顯示 `pause.fill`；暫停或時間到時顯示 `play.fill`。
+- 結束按鈕：顯示 `xmark`，用來結束目前倒數。
+
+這些按鈕不是用 `Link(destination:)` 打開 App，而是用：
+
+```swift
+Button(intent: ToggleEyeCareLiveActivityIntent()) { ... }
+Button(intent: ResetEyeCareLiveActivityIntent()) { ... }
+```
+
+這樣按鈕可以直接在 Lock Screen / Dynamic Island 執行，不需要先打開 App。
+
+不過要注意一點：`LiveActivityIntent` 雖然由 Widget Extension 的 UI 呼叫，但 iOS 會在主 App process 執行這些 Intent。因此目前專案有兩份同名 Intent：
+
+- `20-20-20/EyeCareLiveActivityIntents.swift`
+- `20-20-20LiveActivityExtension/EyeCareLiveActivityIntents.swift`
+
+App target 內的版本負責真正執行動作。Widget extension 內的版本則是讓 Live Activity UI 編譯時能找到 `ToggleEyeCareLiveActivityIntent` 和 `ResetEyeCareLiveActivityIntent`。
+
+#### 9.2.2 command token 同步機制
+
+Live Activity 的 AppIntent 不能直接存取畫面中的 `TimerManager` instance。為了讓 Lock Screen 按鈕可以真正控制倒數，專案使用 command token 機制：
+
+1. 使用者在 Live Activity 按下開始 / 暫停或結束。
+2. AppIntent 更新 Live Activity 的 `ContentState`，寫入：
+   - `controlCommand`
+   - `controlCommandID`
+3. `TimerManager` 每 0.2 秒檢查目前 Live Activity state。
+4. 如果發現新的 `controlCommandID`，就根據 `controlCommand` 執行：
+   - `toggleOrAdvanceFromLiveActivity()`
+   - `reset()`
+5. `lastHandledLiveActivityCommandID` 會記住已處理過的命令，避免同一個按鈕事件被重複執行。
+
+這個做法不需要 App Group，也不需要把 `TimerManager` 放入 extension。代價是：如果主 App process 已被系統完全終止，按鈕未必能即時同步到 App 內狀態；但正常背景存活時可以工作。
+
+#### 9.2.3 下一階段不重建 Live Activity
+
+倒數完成後，Live Activity 會進入 `isAlarming` 狀態並顯示 `0:00` / `時間到`。如果使用者按下開始 / 暫停按鈕，意思是「確認並進入下一階段」。
+
+之前 `nextStep()` 會先呼叫 `EyeCareLiveActivityManager.shared.end()`，然後 `start()` 再建立新 Live Activity。這會令 Lock Screen 上的 Live Activity 看起來像「退出又返回」。
+
+現在 `nextStep()` 不再結束 Live Activity，而是保留同一張卡片並更新內容。只有真正 `reset()` 時，才會結束 Live Activity。
 
 ### 9.3 Apple Watch 版本
 
