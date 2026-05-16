@@ -35,6 +35,11 @@ struct ContentView: View {
         .background(WindowInitialSizeConfigurator(width: 400, height: 600))
         #endif
         .onAppear { manager.setupOnLaunch() } // 畫面加載完成後進行權限請求
+        #if os(iOS)
+        .onOpenURL { url in
+            handleLiveActivityURL(url)
+        }
+        #endif
     }
 }
 
@@ -297,4 +302,20 @@ extension ContentView {
             return 80
         }
     }
+    
+    #if os(iOS)
+    private func handleLiveActivityURL(_ url: URL) {
+        guard url.scheme == "eyecaretimer", url.host == "live-activity" else { return }
+        
+        switch url.lastPathComponent {
+        case "pause":
+            guard manager.isRunning else { return }
+            manager.pause()
+        case "reset":
+            manager.reset()
+        default:
+            break
+        }
+    }
+    #endif
 }

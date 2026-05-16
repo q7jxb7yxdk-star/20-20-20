@@ -50,6 +50,9 @@ class TimerManager: NSObject, ObservableObject {
     // iOS 從 Settings App 回來時會連續收到 willEnterForeground / didBecomeActive。
     // 保存延遲刷新 Task，讓新事件可以取消舊事件，避免短時間內重複刷新多次。
     private var settingsRefreshTask: Task<Void, Never>?
+    // Live Activity 使用靜態文字顯示剩餘時間，避免 Simulator SpringBoard 在系統 timer renderer 歸零時崩潰。
+    // 這裡節流到每秒更新一次，避免每 0.2 秒都呼叫 ActivityKit。
+    private var lastLiveActivityUpdateSecond: Int?
     #endif
     
     override init() {
@@ -107,6 +110,9 @@ class TimerManager: NSObject, ObservableObject {
         
         if diff > 0 {
             timeRemaining = diff // 更新剩餘時間
+            #if os(iOS)
+            updateLiveActivityIfNeeded()
+            #endif
         } else if isRunning {
             // diff <= 0 表示已經到達或超過目標時間；此時切到響鈴狀態。
             triggerAlarm() // 歸零，觸發鬧鐘
@@ -218,6 +224,7 @@ class TimerManager: NSObject, ObservableObject {
         #else
         let token = UUID()
         alarmSchedulingToken = token
+        lastLiveActivityUpdateSecond = nil
         startOrUpdateLiveActivity()
         // AlarmKit API 是 async，所以放進 Task。
         // expectedToken 讓排程完成時能確認它仍然是最新那次開始操作。
@@ -258,7 +265,7 @@ class TimerManager: NSObject, ObservableObject {
         timeRemaining = 0
         targetDate = nil
         #if os(iOS)
-        EyeCareLiveActivityManager.shared.end()
+        EyeCareLiveActivityManager.shared.finishAndEnd(step: currentStep)
         #endif
         
         // macOS 不論 App 是否在前景，都明確送出通知；自訂聲音由 App 內播放。
@@ -307,6 +314,13 @@ class TimerManager: NSObject, ObservableObject {
             isRunning: liveActivityIsRunning ?? isRunning,
             isAlarming: isAlarming
         )
+    }
+    
+    private func updateLiveActivityIfNeeded() {
+        let currentSecond = max(0, Int(ceil(timeRemaining)))
+        guard currentSecond != lastLiveActivityUpdateSecond else { return }
+        lastLiveActivityUpdateSecond = currentSecond
+        startOrUpdateLiveActivity()
     }
     #endif
 

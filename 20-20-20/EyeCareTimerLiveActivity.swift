@@ -10,6 +10,7 @@ struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         var stepName: String
         var themeName: String
+        var startDate: Date
         var endDate: Date
         var remainingSeconds: Double
         var isRunning: Bool
@@ -62,10 +63,34 @@ final class EyeCareLiveActivityManager {
         }
     }
     
+    func finishAndEnd(step: TimerStep) {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        
+        // 倒數剛完成時先更新成一個穩定的 00:00 狀態。
+        // 這比同一刻直接 .immediate dismiss 更溫和，可避開 Simulator SpringBoard 在邊界時間 render Live Activity 時崩潰。
+        let finishedState = makeState(
+            step: step,
+            remainingSeconds: 0,
+            endDate: Date(),
+            isRunning: false,
+            isAlarming: true
+        )
+        
+        Task {
+            for activity in Activity<EyeCareTimerLiveActivityAttributes>.activities {
+                await activity.update(ActivityContent(state: finishedState, staleDate: nil))
+            }
+        }
+    }
+    
     private func makeState(step: TimerStep, remainingSeconds: Double, endDate: Date, isRunning: Bool, isAlarming: Bool) -> EyeCareTimerLiveActivityAttributes.ContentState {
-        EyeCareTimerLiveActivityAttributes.ContentState(
+        let duration = max(1, remainingSeconds)
+        let startDate = endDate.addingTimeInterval(-duration)
+        
+        return EyeCareTimerLiveActivityAttributes.ContentState(
             stepName: step.name,
             themeName: themeName(for: step),
+            startDate: startDate,
             endDate: endDate,
             remainingSeconds: remainingSeconds,
             isRunning: isRunning,
