@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -6,12 +7,14 @@ import WidgetKit
 
 // 這個型別要和 App target 裡的 EyeCareTimerLiveActivityAttributes 保持一致。
 // App target 會把 ContentState 傳給 ActivityKit；Widget Extension 會收到同一份 state 來畫 UI。
-struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
+nonisolated struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
     // ContentState 是會被 App 不斷更新的資料。
     // Live Activity 不是自己跑 Timer，而是靠 App 定期推送新的 remainingSeconds。
     public struct ContentState: Codable, Hashable {
         // 目前階段名稱，例如「專注工作」。
         var stepName: String
+        // 目前階段 index，AppIntent 會用它計算下一階段。
+        var stepIndex: Int
         // 簡單字串形式的主題色，例如 blue / green / orange。
         var themeName: String
         // 保留開始與結束時間，方便日後如果要改用系統 timer renderer。
@@ -23,6 +26,12 @@ struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
         var isRunning: Bool
         // 是否已經倒數完成並進入響鈴狀態。
         var isAlarming: Bool
+        // true 代表目前 Live Activity 用 Debug 測試時間。
+        var isDebugMode: Bool
+        // AppIntent 按鈕會把控制命令寫入這裡，主 App 再讀取並真正控制 TimerManager。
+        var controlCommand: String?
+        // 每次按鈕產生新的 UUID，避免同一個命令被主 App 重複處理。
+        var controlCommandID: UUID?
     }
     
     // 建立 Activity 時固定的標題。
@@ -42,7 +51,7 @@ struct EyeCareTimerLiveActivityWidget: Widget {
                 // 系統 action 前景色，例如某些系統按鈕或強調色。
                 .activitySystemActionForegroundColor(.orange)
                 // 點擊 Live Activity 空白區域時打開 App。
-                // 注意：pause / reset 兩個圓形按鈕自己有 Link，不靠這個 URL。
+                // 兩個圓形按鈕改用 AppIntent，所以按下按鈕時可以直接控制，不需要打開 App。
                 .widgetURL(openURL)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -93,14 +102,14 @@ private struct LiveActivityLockScreenView: View {
             HStack(spacing: 10) {
                 liveActivityIconLink(
                     systemName: startPauseSystemName,
-                    url: toggleURL,
+                    intent: ToggleEyeCareLiveActivityIntent(),
                     foreground: .orange,
                     background: .orange.opacity(0.34)
                 )
 
                 liveActivityIconLink(
                     systemName: "xmark",
-                    url: resetURL,
+                    intent: ResetEyeCareLiveActivityIntent(),
                     foreground: .white,
                     background: Color(.systemGray3).opacity(0.38)
                 )
@@ -198,28 +207,21 @@ private struct LiveActivityExpandedView: View {
 
 // MARK: - URL Actions
 
-private var toggleURL: URL {
-    URL(string: "eyecaretimer://live-activity/toggle")!
-}
-
-private var resetURL: URL {
-    URL(string: "eyecaretimer://live-activity/reset")!
-}
-
 private var openURL: URL {
     URL(string: "eyecaretimer://live-activity/open")!
 }
 
-private func liveActivityIconLink(systemName: String, url: URL, foreground: Color, background: Color) -> some View {
-    // Live Activity 入面的按鈕不能直接呼叫 App 裡的 Swift function。
-    // 這裡用 Link 開啟自訂 URL scheme，再由 ContentView.onOpenURL 接收並轉成 pause / reset。
-    Link(destination: url) {
+private func liveActivityIconLink<Intent: AppIntent>(systemName: String, intent: Intent, foreground: Color, background: Color) -> some View {
+    // Button(intent:) 會直接執行 AppIntent，不會像 Link 一樣打開 App。
+    // 這是 iOS 互動式 Widget / Live Activity 的原生做法。
+    Button(intent: intent) {
         Image(systemName: systemName)
             .font(.system(size: 28, weight: .semibold))
             .frame(width: 56, height: 56)
             .foregroundStyle(foreground)
             .background(background, in: Circle())
     }
+    .buttonStyle(.plain)
 }
 
 // MARK: - Formatting

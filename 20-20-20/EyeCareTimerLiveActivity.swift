@@ -10,12 +10,14 @@ import SwiftUI
 //
 // 兩邊都要宣告相同名稱、相同欄位的 Attributes 型別。
 // ActivityKit 會用這個型別把 App 傳出的資料交給 Widget Extension。
-struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
+nonisolated struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
     // ContentState 是「會隨時間改變」的資料。
     // 例如剩餘秒數、是否正在響鈴、目前階段名稱，都會在倒數途中更新。
     public struct ContentState: Codable, Hashable {
         // 顯示目前階段，例如「專注工作」、「遠眺放鬆」。
         var stepName: String
+        // 目前階段的 index，讓 Live Activity 按鈕不用打開 App 也知道下一階段是哪一個。
+        var stepIndex: Int
         // Widget Extension 不直接認識 TimerStep enum，所以用簡單字串傳主題色。
         var themeName: String
         // 倒數開始時間；目前主要保留作狀態資料，方便日後改成系統 timer renderer。
@@ -28,6 +30,13 @@ struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
         var isRunning: Bool
         // true 代表倒數已完成並進入響鈴 / 等待確認狀態。
         var isAlarming: Bool
+        // 記錄建立 Live Activity 時使用 Debug 還是 Release 時間，讓 AppIntent 可計算下一階段秒數。
+        var isDebugMode: Bool
+        // Live Activity 按鈕不能直接碰 App 內的 TimerManager。
+        // 所以按鈕會先把 command 寫入 Activity state，TimerManager 再讀取並執行。
+        var controlCommand: String?
+        // 每次按鈕都產生新的 UUID；TimerManager 用它分辨「新命令」和「已處理過的命令」。
+        var controlCommandID: UUID?
     }
     
     // Attributes 本身是「建立 Activity 後通常不變」的資料。
@@ -120,12 +129,16 @@ final class EyeCareLiveActivityManager {
         
         return EyeCareTimerLiveActivityAttributes.ContentState(
             stepName: step.name,
+            stepIndex: step.rawValue,
             themeName: themeName(for: step),
             startDate: startDate,
             endDate: endDate,
             remainingSeconds: remainingSeconds,
             isRunning: isRunning,
-            isAlarming: isAlarming
+            isAlarming: isAlarming,
+            isDebugMode: AppConfiguration.runMode == .debug,
+            controlCommand: nil,
+            controlCommandID: nil
         )
     }
     

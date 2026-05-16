@@ -12,13 +12,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		96B60C752FAF357E00E0B0D5 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 9662EDE52FA660E600A2C2E2 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 96B60C6C2FAF357E00E0B0D5;
-			remoteInfo = "20-20-20_AppleWatch Watch App";
-		};
 		7F0061BE5163452CB7CD05FF /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9662EDE52FA660E600A2C2E2 /* Project object */;
@@ -26,21 +19,16 @@
 			remoteGlobalIDString = 72B76D565CB2481BA9030C31;
 			remoteInfo = "20-20-20LiveActivityExtension";
 		};
+		96B60C752FAF357E00E0B0D5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9662EDE52FA660E600A2C2E2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 96B60C6C2FAF357E00E0B0D5;
+			remoteInfo = "20-20-20_AppleWatch Watch App";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		96B60C782FAF357E00E0B0D5 /* Embed Watch Content */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
-			dstSubfolderSpec = 16;
-			files = (
-				96B60C772FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app in Embed Watch Content */,
-			);
-			name = "Embed Watch Content";
-			platformFilter = ios;
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		8E1856C14A324F2D941B13E8 /* Embed App Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -50,15 +38,25 @@
 				979050BD2C0145109FDDFBE7 /* 20-20-20LiveActivityExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
-			platformFilter = ios;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		96B60C782FAF357E00E0B0D5 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				96B60C772FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		341E0A5A4A774B0DB610988A /* 20-20-20LiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "20-20-20LiveActivityExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9662EDED2FA660E600A2C2E2 /* 20-20-20.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "20-20-20.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		96B60C6D2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "20-20-20_AppleWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		341E0A5A4A774B0DB610988A /* 20-20-20LiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "20-20-20LiveActivityExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -93,6 +91,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		7EB26953200841A4AB6F9616 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9662EDEA2FA660E600A2C2E2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -101,13 +106,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		96B60C6A2FAF357E00E0B0D5 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		7EB26953200841A4AB6F9616 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -140,6 +138,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		72B76D565CB2481BA9030C31 /* 20-20-20LiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ED66DEEADDFE49B596060103 /* Build configuration list for PBXNativeTarget "20-20-20LiveActivityExtension" */;
+			buildPhases = (
+				46E972D3C706437E90A7918C /* Sources */,
+				7EB26953200841A4AB6F9616 /* Frameworks */,
+				5CE9C7F9CC95483289D4F6B1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D5CB9BE01F0A4A0D861BFA3F /* 20-20-20LiveActivityExtension */,
+			);
+			name = "20-20-20LiveActivityExtension";
+			packageProductDependencies = (
+			);
+			productName = "20-20-20LiveActivityExtension";
+			productReference = 341E0A5A4A774B0DB610988A /* 20-20-20LiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		9662EDEC2FA660E600A2C2E2 /* 20-20-20 */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9662EDF82FA660E700A2C2E2 /* Build configuration list for PBXNativeTarget "20-20-20" */;
@@ -188,28 +208,6 @@
 			productReference = 96B60C6D2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
 		};
-		72B76D565CB2481BA9030C31 /* 20-20-20LiveActivityExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = ED66DEEADDFE49B596060103 /* Build configuration list for PBXNativeTarget "20-20-20LiveActivityExtension" */;
-			buildPhases = (
-				46E972D3C706437E90A7918C /* Sources */,
-				7EB26953200841A4AB6F9616 /* Frameworks */,
-				5CE9C7F9CC95483289D4F6B1 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				D5CB9BE01F0A4A0D861BFA3F /* 20-20-20LiveActivityExtension */,
-			);
-			name = "20-20-20LiveActivityExtension";
-			packageProductDependencies = (
-			);
-			productName = "20-20-20LiveActivityExtension";
-			productReference = 341E0A5A4A774B0DB610988A /* 20-20-20LiveActivityExtension.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -220,13 +218,13 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
+					72B76D565CB2481BA9030C31 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
 					9662EDEC2FA660E600A2C2E2 = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
 					96B60C6C2FAF357E00E0B0D5 = {
-						CreatedOnToolsVersion = 26.4.1;
-					};
-					72B76D565CB2481BA9030C31 = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
 				};
@@ -253,6 +251,13 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		5CE9C7F9CC95483289D4F6B1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9662EDEB2FA660E600A2C2E2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -267,16 +272,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		5CE9C7F9CC95483289D4F6B1 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		46E972D3C706437E90A7918C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-/* End PBXResourcesBuildPhase section */
-
-/* Begin PBXSourcesBuildPhase section */
 		9662EDE92FA660E600A2C2E2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -291,27 +296,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		46E972D3C706437E90A7918C /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		96B60C762FAF357E00E0B0D5 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			platformFilter = ios;
-			target = 96B60C6C2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App */;
-			targetProxy = 96B60C752FAF357E00E0B0D5 /* PBXContainerItemProxy */;
-		};
 		14ED787A4B27438EBE26517F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			platformFilter = ios;
 			target = 72B76D565CB2481BA9030C31 /* 20-20-20LiveActivityExtension */;
 			targetProxy = 7F0061BE5163452CB7CD05FF /* PBXContainerItemProxy */;
+		};
+		96B60C762FAF357E00E0B0D5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = 96B60C6C2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App */;
+			targetProxy = 96B60C752FAF357E00E0B0D5 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -624,38 +622,6 @@
 			};
 			name = Release;
 		};
-		D7A91832D6664019A31077CC /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20260514;
-				DEVELOPMENT_TEAM = WX793X49GJ;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "20-20-20LiveActivityExtension/Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 2026.05.08.19.36;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sunny.eyecaretimer.liveactivity;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
 		A4E55D73DFF84FE6AE5995D2 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -688,6 +654,38 @@
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
+		};
+		D7A91832D6664019A31077CC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 20260514;
+				DEVELOPMENT_TEAM = WX793X49GJ;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "20-20-20LiveActivityExtension/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2026.05.08.19.36;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunny.eyecaretimer.liveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 

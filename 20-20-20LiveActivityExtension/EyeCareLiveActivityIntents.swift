@@ -1,0 +1,196 @@
+import ActivityKit
+import AppIntents
+import Foundation
+
+// MARK: - Live Activity Interactive Button Intents
+
+// 這個檔案只放 Widget / Live Activity 按鈕用的 AppIntent。
+// Button(intent:) 會在 extension / intent 環境直接執行 perform()，不需要打開 App。
+//
+// 注意：AppIntent 不是 App 畫面裡的 TimerManager。
+// 它可以直接更新 Live Activity 的 ContentState，但不能直接操作 App 記憶體中的 TimerManager instance。
+
+struct ToggleEyeCareLiveActivityIntent: LiveActivityIntent {
+    nonisolated static let title: LocalizedStringResource = "開始或暫停 20-20-20"
+    nonisolated static let description = IntentDescription("在 Lock Screen Live Activity 直接開始、暫停，或在時間到後進入下一階段。")
+    nonisolated static let openAppWhenRun = false
+    
+    nonisolated init() {}
+    
+    func perform() async throws -> some IntentResult {
+        for activity in Activity<EyeCareTimerLiveActivityAttributes>.activities {
+            let state = activity.content.state
+            let newState: EyeCareTimerLiveActivityAttributes.ContentState
+            
+            if state.isAlarming {
+                // 時間到之後，按下 play 代表「確認並開始下一階段」。
+                newState = Self.nextRunningState(from: state)
+            } else if state.isRunning {
+                // 正在倒數時，按下 pause 代表暫停。
+                newState = Self.pausedState(from: state)
+            } else {
+                // 已暫停時，按下 play 代表用剩餘時間繼續倒數。
+                newState = Self.runningState(from: state)
+            }
+            
+            await activity.update(ActivityContent(state: Self.state(newState, withCommand: "toggle"), staleDate: nil))
+        }
+        
+        return .result()
+    }
+    
+    private static func pausedState(from state: EyeCareTimerLiveActivityAttributes.ContentState) -> EyeCareTimerLiveActivityAttributes.ContentState {
+        let remainingSeconds = max(0, state.endDate.timeIntervalSinceNow)
+        let endDate = Date().addingTimeInterval(remainingSeconds)
+        
+        return EyeCareTimerLiveActivityAttributes.ContentState(
+            stepName: state.stepName,
+            stepIndex: state.stepIndex,
+            themeName: state.themeName,
+            startDate: endDate.addingTimeInterval(-max(1, remainingSeconds)),
+            endDate: endDate,
+            remainingSeconds: remainingSeconds,
+            isRunning: false,
+            isAlarming: false,
+            isDebugMode: state.isDebugMode,
+            controlCommand: state.controlCommand,
+            controlCommandID: state.controlCommandID
+        )
+    }
+    
+    private static func runningState(from state: EyeCareTimerLiveActivityAttributes.ContentState) -> EyeCareTimerLiveActivityAttributes.ContentState {
+        let remainingSeconds = max(1, state.remainingSeconds)
+        let endDate = Date().addingTimeInterval(remainingSeconds)
+        
+        return EyeCareTimerLiveActivityAttributes.ContentState(
+            stepName: state.stepName,
+            stepIndex: state.stepIndex,
+            themeName: state.themeName,
+            startDate: Date(),
+            endDate: endDate,
+            remainingSeconds: remainingSeconds,
+            isRunning: true,
+            isAlarming: false,
+            isDebugMode: state.isDebugMode,
+            controlCommand: state.controlCommand,
+            controlCommandID: state.controlCommandID
+        )
+    }
+    
+    private static func nextRunningState(from state: EyeCareTimerLiveActivityAttributes.ContentState) -> EyeCareTimerLiveActivityAttributes.ContentState {
+        let nextStepIndex = (state.stepIndex + 1) % Self.stepCount
+        let duration = Self.duration(for: nextStepIndex, isDebugMode: state.isDebugMode)
+        let endDate = Date().addingTimeInterval(duration)
+        
+        return EyeCareTimerLiveActivityAttributes.ContentState(
+            stepName: Self.stepName(for: nextStepIndex),
+            stepIndex: nextStepIndex,
+            themeName: Self.themeName(for: nextStepIndex),
+            startDate: Date(),
+            endDate: endDate,
+            remainingSeconds: duration,
+            isRunning: true,
+            isAlarming: false,
+            isDebugMode: state.isDebugMode,
+            controlCommand: state.controlCommand,
+            controlCommandID: state.controlCommandID
+        )
+    }
+    
+    private nonisolated static let stepCount = 4
+    
+    private nonisolated static func stepName(for index: Int) -> String {
+        switch index {
+        case 0:
+            return "第一階段：專注工作"
+        case 1:
+            return "第二階段：遠眺放鬆"
+        case 2:
+            return "第三階段：專注工作"
+        default:
+            return "第四階段：深度休息"
+        }
+    }
+    
+    private nonisolated static func themeName(for index: Int) -> String {
+        switch index {
+        case 1:
+            return "green"
+        case 3:
+            return "orange"
+        default:
+            return "blue"
+        }
+    }
+    
+    private nonisolated static func duration(for index: Int, isDebugMode: Bool) -> Double {
+        if isDebugMode {
+            switch index {
+            case 0, 2:
+                return 10
+            case 1:
+                return 5
+            default:
+                return 8
+            }
+        } else {
+            switch index {
+            case 0, 2:
+                return 20 * 60
+            case 1:
+                return 20
+            default:
+                return 3 * 60
+            }
+        }
+    }
+    
+    private static func state(
+        _ state: EyeCareTimerLiveActivityAttributes.ContentState,
+        withCommand command: String
+    ) -> EyeCareTimerLiveActivityAttributes.ContentState {
+        EyeCareTimerLiveActivityAttributes.ContentState(
+            stepName: state.stepName,
+            stepIndex: state.stepIndex,
+            themeName: state.themeName,
+            startDate: state.startDate,
+            endDate: state.endDate,
+            remainingSeconds: state.remainingSeconds,
+            isRunning: state.isRunning,
+            isAlarming: state.isAlarming,
+            isDebugMode: state.isDebugMode,
+            controlCommand: command,
+            controlCommandID: UUID()
+        )
+    }
+}
+
+struct ResetEyeCareLiveActivityIntent: LiveActivityIntent {
+    nonisolated static let title: LocalizedStringResource = "結束 20-20-20"
+    nonisolated static let description = IntentDescription("直接結束目前的 Lock Screen Live Activity。")
+    nonisolated static let openAppWhenRun = false
+    
+    nonisolated init() {}
+    
+    func perform() async throws -> some IntentResult {
+        for activity in Activity<EyeCareTimerLiveActivityAttributes>.activities {
+            let state = activity.content.state
+            let commandState = EyeCareTimerLiveActivityAttributes.ContentState(
+                stepName: state.stepName,
+                stepIndex: state.stepIndex,
+                themeName: state.themeName,
+                startDate: state.startDate,
+                endDate: state.endDate,
+                remainingSeconds: state.remainingSeconds,
+                isRunning: false,
+                isAlarming: false,
+                isDebugMode: state.isDebugMode,
+                controlCommand: "reset",
+                controlCommandID: UUID()
+            )
+            await activity.update(ActivityContent(state: commandState, staleDate: nil))
+        }
+        
+        return .result()
+    }
+}

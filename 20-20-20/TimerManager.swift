@@ -3,6 +3,7 @@ import SwiftUI
 import Combine
 
 #if os(iOS)
+import ActivityKit
 import AlarmKit
 import UIKit
 #elseif os(macOS)
@@ -53,6 +54,10 @@ class TimerManager: NSObject, ObservableObject {
     // Live Activity 使用靜態文字顯示剩餘時間，避免 Simulator SpringBoard 在系統 timer renderer 歸零時崩潰。
     // 這裡節流到每秒更新一次，避免每 0.2 秒都呼叫 ActivityKit。
     private var lastLiveActivityUpdateSecond: Int?
+    // 記住最後處理過的 Live Activity 按鈕命令，避免同一次按鈕被重複執行。
+    private var lastHandledLiveActivityCommandID: UUID?
+    // 防止讀取 command 時又被 Timer tick 重入，令同一瞬間建立太多 Task。
+    private var isCheckingLiveActivityCommand = false
     #endif
     
     override init() {
@@ -104,6 +109,10 @@ class TimerManager: NSObject, ObservableObject {
 
     // 計算「現在」與「目標時間」差了幾秒
     private func syncRemainingTime() {
+        #if os(iOS)
+        handleLiveActivityControlCommandIfNeeded()
+        #endif
+        
         // guard 提早退出：只有正在倒數且有目標時間時，才需要更新畫面。
         guard isRunning, let target = targetDate else { return }
         let diff = target.timeIntervalSinceNow // 計算秒數差
@@ -317,6 +326,30 @@ class TimerManager: NSObject, ObservableObject {
     }
     
     #if os(iOS)
+    private func handleLiveActivityControlCommandIfNeeded() {
+        guard !isCheckingLiveActivityCommand else { return }
+        isCheckingLiveActivityCommand = true
+        
+        Task { @MainActor in
+            defer { isCheckingLiveActivityCommand = false }
+            
+            guard let state = Activity<EyeCareTimerLiveActivityAttributes>.activities.first?.content.state else { return }
+            guard let command = state.controlCommand, let commandID = state.controlCommandID else { return }
+            guard commandID != lastHandledLiveActivityCommandID else { return }
+            
+            lastHandledLiveActivityCommandID = commandID
+            
+            switch command {
+            case "toggle":
+                toggleOrAdvanceFromLiveActivity()
+            case "reset":
+                reset()
+            default:
+                break
+            }
+        }
+    }
+    
     private func startOrUpdateLiveActivity(isRunning liveActivityIsRunning: Bool? = nil) {
         // targetDate 是這次倒數真正的結束時間。
         // 如果 targetDate 暫時不存在，就用目前剩餘秒數推算一個 endDate，避免 Live Activity 沒有時間資料。
