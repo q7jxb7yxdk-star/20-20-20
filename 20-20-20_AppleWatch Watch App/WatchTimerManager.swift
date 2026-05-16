@@ -96,6 +96,8 @@ final class WatchTimerManager: NSObject, ObservableObject {
     }
     
     func reloadDurationIfIdle() {
+        // 即使倒數正在跑，語言同步後也要通知 SwiftUI 重畫標題文字。
+        objectWillChange.send()
         // 如果倒數正在跑或正在響，不中途改時間，避免 targetDate 和 smart alarm session 被改亂。
         guard !isRunning, !isAlarming else { return }
         timeRemaining = Double(currentStep.seconds)

@@ -12,12 +12,7 @@ enum TimerStep: Int, CaseIterable {
     
     // 每個階段在介面上顯示的中文名稱
     var name: String {
-        switch self {
-        case .work1: return "第一階段：專注工作"
-        case .eyeCare: return "第二階段：遠眺放鬆"
-        case .work2: return "第三階段：專注工作"
-        case .longRest: return "第四階段：深度休息"
-        }
+        AppText.stepName(self)
     }
     
     // 每個階段的持續時間（秒）
@@ -57,21 +52,22 @@ enum AppConfiguration {
         
         var displayName: String {
             switch self {
-            case .debug: return "Debug 測試模式"
-            case .release: return "Release 正式模式"
+            case .debug: return AppText.debugModeName
+            case .release: return AppText.releaseModeName
             }
         }
         
         var description: String {
             switch self {
-            case .debug: return "使用短時間，方便快速測試倒數、通知和響鈴。"
-            case .release: return "使用正式時間，適合日常真正護眼使用。"
+            case .debug: return AppText.debugModeDescription
+            case .release: return AppText.releaseModeDescription
             }
         }
     }
     
     enum DefaultsKey {
-        static let runMode = "app_run_mode"
+        nonisolated static let runMode = "app_run_mode"
+        nonisolated static let languageCode = "app_language_code"
     }
     
     // typealias 可以把一組複雜型別取一個好懂的名字。
@@ -81,7 +77,8 @@ enum AppConfiguration {
     static func registerDefaults() {
         // register(defaults:) 不會覆蓋使用者已經揀好的設定，只會提供第一次啟動時的預設值。
         UserDefaults.standard.register(defaults: [
-            DefaultsKey.runMode: RunMode.release.rawValue
+            DefaultsKey.runMode: RunMode.release.rawValue,
+            DefaultsKey.languageCode: AppLanguage.systemPreferred.rawValue
         ])
     }
     

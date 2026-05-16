@@ -8,28 +8,56 @@
             <key>Type</key>
             <string>PSGroupSpecifier</string>
             <key>Title</key>
-            <string>運行模式</string>
+            <string>RUN_MODE_GROUP_TITLE</string>
             <key>FooterText</key>
-            <string>Debug 使用短時間測試；Release 使用正式護眼時間。</string>
+            <string>RUN_MODE_GROUP_FOOTER</string>
         </dict>
         <dict>
             <key>Type</key>
             <string>PSMultiValueSpecifier</string>
             <key>Title</key>
-            <string>模式</string>
+            <string>RUN_MODE_TITLE</string>
             <key>Key</key>
             <string>app_run_mode</string>
             <key>DefaultValue</key>
             <string>release</string>
             <key>Titles</key>
             <array>
-                <string>Debug 測試模式</string>
-                <string>Release 正式模式</string>
+                <string>RUN_MODE_DEBUG</string>
+                <string>RUN_MODE_RELEASE</string>
             </array>
             <key>Values</key>
             <array>
                 <string>debug</string>
                 <string>release</string>
+            </array>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>LANGUAGE_GROUP_TITLE</string>
+            <key>FooterText</key>
+            <string>LANGUAGE_GROUP_FOOTER</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSMultiValueSpecifier</string>
+            <key>Title</key>
+            <string>LANGUAGE_TITLE</string>
+            <key>Key</key>
+            <string>app_language_code</string>
+            <key>DefaultValue</key>
+            <string>en</string>
+            <key>Titles</key>
+            <array>
+                <string>LANGUAGE_ENGLISH</string>
+                <string>LANGUAGE_CHINESE</string>
+            </array>
+            <key>Values</key>
+            <array>
+                <string>en</string>
+                <string>zh-Hant</string>
             </array>
         </dict>
     </array>

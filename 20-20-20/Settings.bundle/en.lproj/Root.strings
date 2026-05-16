@@ -1,0 +1,10 @@
+"RUN_MODE_GROUP_TITLE" = "Run Mode";
+"RUN_MODE_GROUP_FOOTER" = "Debug uses short durations for testing; Release uses normal eye-care durations.";
+"RUN_MODE_TITLE" = "Mode";
+"RUN_MODE_DEBUG" = "Debug Test Mode";
+"RUN_MODE_RELEASE" = "Release Mode";
+"LANGUAGE_GROUP_TITLE" = "Language";
+"LANGUAGE_GROUP_FOOTER" = "Choose the App UI language. The first launch follows your system language.";
+"LANGUAGE_TITLE" = "Language";
+"LANGUAGE_ENGLISH" = "English";
+"LANGUAGE_CHINESE" = "Chinese";

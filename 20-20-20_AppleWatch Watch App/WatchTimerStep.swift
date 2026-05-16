@@ -10,29 +10,15 @@ enum WatchTimerStep: Int, CaseIterable {
     case longRest = 3
     
     var name: String {
-        switch self {
-        case .work1: return "第一階段"
-        case .eyeCare: return "第二階段"
-        case .work2: return "第三階段"
-        case .longRest: return "第四階段"
-        }
+        WatchAppText.stepName(self)
     }
     
     var activeTitle: String {
-        switch self {
-        case .work1, .work2: return "專注工作"
-        case .eyeCare: return "遠眺放鬆"
-        case .longRest: return "深度休息"
-        }
+        WatchAppText.activeTitle(self)
     }
     
     var completedTitle: String {
-        switch self {
-        case .work1: return "第一階段完成 🎉"
-        case .eyeCare: return "第二階段完成 💪🏼"
-        case .work2: return "第三階段完成 🎉"
-        case .longRest: return "第四階段完成 💪🏼"
-        }
+        WatchAppText.completedTitle(self)
     }
     
     var seconds: Int {
@@ -69,14 +55,15 @@ enum WatchAppConfiguration {
         
         var displayName: String {
             switch self {
-            case .debug: return "Debug 測試模式"
-            case .release: return "Release 正式模式"
+            case .debug: return WatchAppText.debugModeName
+            case .release: return WatchAppText.releaseModeName
             }
         }
     }
     
     enum DefaultsKey {
         static let runMode = "app_run_mode"
+        static let languageCode = "app_language_code"
     }
     
     typealias DurationConfiguration = (work: Int, eyeCare: Int, longRest: Int)
@@ -85,7 +72,8 @@ enum WatchAppConfiguration {
         // 預設使用正式時間；如果 iPhone 有同步 app_run_mode，這個預設值就會被使用者設定取代。
         // 測試時如果想完全不靠 iPhone，也可以暫時把 .release 改成 .debug。
         UserDefaults.standard.register(defaults: [
-            DefaultsKey.runMode: RunMode.release.rawValue
+            DefaultsKey.runMode: RunMode.release.rawValue,
+            DefaultsKey.languageCode: WatchAppLanguage.current.rawValue
         ])
     }
     

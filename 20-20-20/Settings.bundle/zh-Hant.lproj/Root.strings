@@ -1,0 +1,10 @@
+"RUN_MODE_GROUP_TITLE" = "運行模式";
+"RUN_MODE_GROUP_FOOTER" = "Debug 使用短時間測試；Release 使用正式護眼時間。";
+"RUN_MODE_TITLE" = "模式";
+"RUN_MODE_DEBUG" = "Debug 測試模式";
+"RUN_MODE_RELEASE" = "Release 正式模式";
+"LANGUAGE_GROUP_TITLE" = "語言";
+"LANGUAGE_GROUP_FOOTER" = "選擇 App UI 語言。第一次啟動會跟隨系統語言。";
+"LANGUAGE_TITLE" = "語言";
+"LANGUAGE_ENGLISH" = "English";
+"LANGUAGE_CHINESE" = "中文";

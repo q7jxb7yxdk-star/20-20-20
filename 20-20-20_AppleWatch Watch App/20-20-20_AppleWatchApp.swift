@@ -37,6 +37,7 @@ final class WatchRunModeReceiver: NSObject {
     static let shared = WatchRunModeReceiver()
     
     private let runModeKey = WatchAppConfiguration.DefaultsKey.runMode
+    private let languageCodeKey = WatchAppConfiguration.DefaultsKey.languageCode
     
     private override init() {
         super.init()
@@ -49,12 +50,26 @@ final class WatchRunModeReceiver: NSObject {
     }
     
     private func applyRunModePayload(_ payload: [String: Any]) {
-        guard let rawValue = payload[runModeKey] as? String else { return }
-        guard WatchAppConfiguration.RunMode(rawValue: rawValue) != nil else { return }
-        guard UserDefaults.standard.string(forKey: runModeKey) != rawValue else { return }
+        var didChange = false
         
-        // Watch 有自己一份 UserDefaults；收到 iPhone 設定後先保存，再通知 manager 更新 idle 畫面。
-        UserDefaults.standard.set(rawValue, forKey: runModeKey)
+        if let rawValue = payload[runModeKey] as? String,
+           WatchAppConfiguration.RunMode(rawValue: rawValue) != nil,
+           UserDefaults.standard.string(forKey: runModeKey) != rawValue {
+            // Watch 有自己一份 UserDefaults；收到 iPhone 設定後先保存，再通知 manager 更新 idle 畫面。
+            UserDefaults.standard.set(rawValue, forKey: runModeKey)
+            didChange = true
+        }
+        
+        if let languageCode = payload[languageCodeKey] as? String,
+           WatchAppLanguage(rawValue: languageCode) != nil,
+           UserDefaults.standard.string(forKey: languageCodeKey) != languageCode {
+            // iPhone 會把目前系統語言判斷結果同步到 Watch。
+            // Watch UI 因此可以跟 iPhone 使用同一套英文 / 繁中選擇。
+            UserDefaults.standard.set(languageCode, forKey: languageCodeKey)
+            didChange = true
+        }
+        
+        guard didChange else { return }
         WatchTimerManager.shared.reloadDurationIfIdle()
     }
 }

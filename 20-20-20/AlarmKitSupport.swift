@@ -13,7 +13,9 @@ nonisolated struct EyeCareAlarmMetadata: AlarmMetadata {
 // LiveActivityIntent 是給系統鬧鐘畫面上的按鈕使用的動作。
 // 使用者即使不打開 App，也可以在系統介面上按「停止」，然後執行這段程式。
 struct StopEyeCareAlarmIntent: LiveActivityIntent {
-    static var title: LocalizedStringResource = "停止護眼提醒"
+    static var title: LocalizedStringResource {
+        "Stop Eye Care Reminder"
+    }
     static var supportedModes: IntentModes = .background
     
     @Parameter(title: "Alarm ID")

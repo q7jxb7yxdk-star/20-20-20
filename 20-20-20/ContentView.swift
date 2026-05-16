@@ -12,8 +12,11 @@ struct ContentView: View {
     // @StateObject 代表 SwiftUI 會替這個 View 持有 TimerManager 的生命週期。
     // 如果改用 @ObservedObject，畫面重建時可能會重新建立 manager，導致倒數狀態遺失。
     @StateObject private var manager = TimerManager() // 引用核心大腦
+    @AppStorage(AppConfiguration.DefaultsKey.languageCode) private var appLanguageCode = AppLanguage.systemPreferred.rawValue
     
     var body: some View {
+        let _ = appLanguageCode
+        
         GeometryReader { proxy in
             let safeSize = proxy.size
             let isLandscape = safeSize.width > safeSize.height
@@ -117,7 +120,7 @@ extension ContentView {
     private var statusHeader: some View {
         // 把畫面拆成多個 private computed property，body 會更短，也更容易閱讀與維護。
         VStack(spacing: 12) {
-            Text("20-20-20 護眼助理")
+            Text(AppText.appTitle)
                 .font(.system(.caption, design: .rounded))
                 .fontWeight(.bold)
                 .foregroundColor(.secondary)
@@ -259,13 +262,13 @@ extension ContentView {
         
         switch manager.currentStep {
         case .work1:
-            return "第一階段完成 🎉"
+            return AppText.completedTitle(.work1)
         case .eyeCare:
-            return "第二階段完成 💪🏼"
+            return AppText.completedTitle(.eyeCare)
         case .work2:
-            return "第三階段完成 🎉"
+            return AppText.completedTitle(.work2)
         case .longRest:
-            return "第四階段完成 💪🏼"
+            return AppText.completedTitle(.longRest)
         }
     }
     

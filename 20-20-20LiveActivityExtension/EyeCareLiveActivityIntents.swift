@@ -11,8 +11,12 @@ import Foundation
 // 它可以直接更新 Live Activity 的 ContentState，但不能直接操作 App 記憶體中的 TimerManager instance。
 
 struct ToggleEyeCareLiveActivityIntent: LiveActivityIntent {
-    nonisolated static let title: LocalizedStringResource = "開始或暫停 20-20-20"
-    nonisolated static let description = IntentDescription("在 Lock Screen Live Activity 直接開始、暫停，或在時間到後進入下一階段。")
+    nonisolated static var title: LocalizedStringResource {
+        "Start / Pause"
+    }
+    nonisolated static var description: IntentDescription {
+        "Start, pause, or advance the current 20-20-20 timer step."
+    }
     nonisolated static let openAppWhenRun = false
     
     nonisolated init() {}
@@ -102,13 +106,13 @@ struct ToggleEyeCareLiveActivityIntent: LiveActivityIntent {
     private nonisolated static func stepName(for index: Int) -> String {
         switch index {
         case 0:
-            return "第一階段：專注工作"
+            return ExtensionAppText.stepName(for: 0)
         case 1:
-            return "第二階段：遠眺放鬆"
+            return ExtensionAppText.stepName(for: 1)
         case 2:
-            return "第三階段：專注工作"
+            return ExtensionAppText.stepName(for: 2)
         default:
-            return "第四階段：深度休息"
+            return ExtensionAppText.stepName(for: 3)
         }
     }
     
@@ -166,8 +170,12 @@ struct ToggleEyeCareLiveActivityIntent: LiveActivityIntent {
 }
 
 struct ResetEyeCareLiveActivityIntent: LiveActivityIntent {
-    nonisolated static let title: LocalizedStringResource = "結束 20-20-20"
-    nonisolated static let description = IntentDescription("直接結束目前的 Lock Screen Live Activity。")
+    nonisolated static var title: LocalizedStringResource {
+        "End"
+    }
+    nonisolated static var description: IntentDescription {
+        "End the current 20-20-20 timer."
+    }
     nonisolated static let openAppWhenRun = false
     
     nonisolated init() {}

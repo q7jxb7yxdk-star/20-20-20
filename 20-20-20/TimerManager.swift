@@ -447,7 +447,7 @@ class TimerManager: NSObject, ObservableObject {
         let id = Alarm.ID()
         // 至少 1 秒後才觸發，避免系統不接受 0 秒或負數排程。
         let fireDate = Date().addingTimeInterval(max(1, timeRemaining))
-        let alert = AlarmPresentation.Alert(title: "時間到！")
+        let alert = AlarmPresentation.Alert(title: LocalizedStringResource(stringLiteral: AppText.notificationTitle))
         // attributes 定義系統鬧鐘畫面上要呈現的文字、顏色與自訂資料。
         let attributes = AlarmAttributes<EyeCareAlarmMetadata>(
             presentation: AlarmPresentation(alert: alert),
@@ -584,8 +584,8 @@ class TimerManager: NSObject, ObservableObject {
         // UNMutableNotificationContent 是系統通知的內容物件。
         // title/body/sound 都在這裡設定，再交給 UNNotificationRequest 排程或立即送出。
         let content = UNMutableNotificationContent()
-        content.title = "時間到！"
-        content.body = "「\(currentStep.name)」已完成，請開始下一階段。"
+        content.title = AppText.notificationTitle
+        content.body = AppText.notificationBody(for: currentStep)
         if #available(iOS 15.0, macOS 12.0, *) {
             content.interruptionLevel = .timeSensitive
         }

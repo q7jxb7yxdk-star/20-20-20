@@ -139,7 +139,7 @@ private struct LiveActivityLockScreenView: View {
     }
     
     private var liveActivityTitle: some View {
-        Text(state.isAlarming ? "時間到" : "20-20-20")
+        Text(state.isAlarming ? ExtensionAppText.timeUp : "20-20-20")
             .font(.system(size: 22, weight: .semibold, design: .rounded))
             .lineLimit(1)
             .minimumScaleFactor(0.72)
@@ -177,7 +177,7 @@ private struct LiveActivityCompactView: View {
                 .font(.title3.monospacedDigit().weight(.semibold))
                 .frame(maxWidth: .infinity, alignment: .trailing)
             
-            Text(state.isAlarming ? "時間到" : state.stepName)
+            Text(state.isAlarming ? ExtensionAppText.timeUp : state.stepName)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -196,7 +196,7 @@ private struct LiveActivityExpandedView: View {
                 .font(.title2.monospacedDigit().weight(.semibold))
                 .frame(maxWidth: .infinity, alignment: .trailing)
             
-            Text(state.isAlarming ? "時間到" : "20-20-20")
+            Text(state.isAlarming ? ExtensionAppText.timeUp : "20-20-20")
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

@@ -50,6 +50,7 @@ final class WatchRunModeSync: NSObject {
     static let shared = WatchRunModeSync()
     
     private let runModeKey = AppConfiguration.DefaultsKey.runMode
+    private let languageCodeKey = AppConfiguration.DefaultsKey.languageCode
     
     private override init() {
         super.init()
@@ -68,7 +69,10 @@ final class WatchRunModeSync: NSObject {
         guard session.activationState == .activated else { return }
         guard session.isPaired, session.isWatchAppInstalled else { return }
         
-        let payload = [runModeKey: AppConfiguration.runMode.rawValue]
+        let payload = [
+            runModeKey: AppConfiguration.runMode.rawValue,
+            languageCodeKey: AppLanguage.current.rawValue
+        ]
         
         // updateApplicationContext 會保存最新設定；Watch 不在線時，下次連上仍可收到。
         do {
