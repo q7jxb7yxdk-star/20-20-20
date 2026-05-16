@@ -524,7 +524,38 @@ try? AlarmManager.shared.cancel(id: id)
 - macOS 沒有公開的 AlarmKit 或 Clock Timer API，所以使用本地通知加 App 內播放聲音。
 - watchOS 對背景播放聲音限制較多，因此使用系統通知聲與 haptic 比自訂鈴聲可靠。
 
-### 9.2 Apple Watch 版本
+### 9.2 iOS Live Activity / Lock Screen 倒數
+
+iOS 版本加入了 Live Activity，目標是讓使用者在 Lock Screen 和 Dynamic Island 看到目前倒數狀態。
+
+相關主要檔案：
+
+| 檔案 | 責任 |
+| --- | --- |
+| `EyeCareTimerLiveActivity.swift` | App 內建立、更新、結束 Live Activity |
+| `EyeCareTimerLiveActivityWidget.swift` | Live Activity extension 的 Lock Screen / Dynamic Island UI |
+
+目前顯示方式：
+
+| 位置 | 顯示方式 |
+| --- | --- |
+| Lock Screen Live Activity | 顯示完整 `m:ss` 秒鐘倒數 |
+| Dynamic Island compact | 顯示完整 `m:ss`，但字體和最大寬度較細，避免遮擋狀態列時間、訊號和電量 |
+| Dynamic Island expanded | 顯示完整 `m:ss`，並顯示 `20-20-20` |
+
+曾經想做成：
+
+- Lock Screen 未觸碰時：`m:--`
+- Lock Screen 觸碰螢幕後：`m:ss`
+- 少於 1 分鐘時：`0:ss`
+
+但 iOS Live Activity Widget 沒有提供 API 讓 App 分辨「Lock Screen 未觸碰」和「Lock Screen 已被觸碰 / 已喚醒」兩種狀態。Widget 只會收到 ActivityKit 傳入的狀態資料，例如 `remainingSeconds`、`isRunning`、`isAlarming`，不能知道使用者是否剛觸碰鎖定畫面。
+
+因此目前採用比較清楚可靠的設計：Lock Screen 和 Dynamic Island 都直接顯示完整秒鐘倒數，避免使用者以為倒數沒有更新。
+
+注意：在 iOS Simulator 測試 Live Activity 時，系統的 Lock Screen / SpringBoard 行為可能和真機不同。如果 Simulator 在倒數歸零附近出現 SpringBoard crash，應優先用真機確認，因為實機行為通常較準確。
+
+### 9.3 Apple Watch 版本
 
 Apple Watch 版本目前以獨立 MVP 方式設計，代碼放在：
 
