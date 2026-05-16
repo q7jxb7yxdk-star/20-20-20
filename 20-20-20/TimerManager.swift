@@ -218,6 +218,7 @@ class TimerManager: NSObject, ObservableObject {
         #else
         let token = UUID()
         alarmSchedulingToken = token
+        startOrUpdateLiveActivity()
         // AlarmKit API 是 async，所以放進 Task。
         // expectedToken 讓排程完成時能確認它仍然是最新那次開始操作。
         Task { await scheduleAlarmKitTimer(expectedToken: token) }
@@ -230,6 +231,9 @@ class TimerManager: NSObject, ObservableObject {
         // 暫停時清掉 targetDate；下次 start 會用目前 timeRemaining 重新建立新的結束時間。
         targetDate = nil
         cancelScheduledAlarm() // 暫停時取消預約的提醒
+        #if os(iOS)
+        startOrUpdateLiveActivity(isRunning: false)
+        #endif
     }
 
     // 重置到最初狀態
@@ -237,6 +241,9 @@ class TimerManager: NSObject, ObservableObject {
         pause()
         isAlarming = false
         stopAlarmSound()
+        #if os(iOS)
+        EyeCareLiveActivityManager.shared.end()
+        #endif
         currentStep = .work1
         timeRemaining = Double(currentStep.seconds)
         triggerHaptic()
@@ -250,6 +257,9 @@ class TimerManager: NSObject, ObservableObject {
         isAlarming = true
         timeRemaining = 0
         targetDate = nil
+        #if os(iOS)
+        EyeCareLiveActivityManager.shared.end()
+        #endif
         
         // macOS 不論 App 是否在前景，都明確送出通知；自訂聲音由 App 內播放。
         #if os(macOS)
@@ -269,6 +279,9 @@ class TimerManager: NSObject, ObservableObject {
         isAlarming = false
         stopScheduledAlarm()
         stopAlarmSound()
+        #if os(iOS)
+        EyeCareLiveActivityManager.shared.end()
+        #endif
         
         let allSteps = TimerStep.allCases
         // rawValue + 1 代表往下一階段；% allSteps.count 讓最後一階段之後回到第一階段。
@@ -283,6 +296,19 @@ class TimerManager: NSObject, ObservableObject {
         }
         triggerHaptic()
     }
+    
+    #if os(iOS)
+    private func startOrUpdateLiveActivity(isRunning liveActivityIsRunning: Bool? = nil) {
+        let endDate = targetDate ?? Date().addingTimeInterval(timeRemaining)
+        EyeCareLiveActivityManager.shared.startOrUpdate(
+            step: currentStep,
+            remainingSeconds: timeRemaining,
+            endDate: endDate,
+            isRunning: liveActivityIsRunning ?? isRunning,
+            isAlarming: isAlarming
+        )
+    }
+    #endif
 
     // 播放提醒聲
     private func playAlarmSound() {
