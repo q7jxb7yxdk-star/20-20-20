@@ -111,6 +111,8 @@ class TimerManager: NSObject, ObservableObject {
         if diff > 0 {
             timeRemaining = diff // 更新剩餘時間
             #if os(iOS)
+            // Live Activity 顯示的是 App 傳入的 remainingSeconds。
+            // 所以倒數進行中要定期把新的秒數同步到 Lock Screen / Dynamic Island。
             updateLiveActivityIfNeeded()
             #endif
         } else if isRunning {
@@ -306,7 +308,12 @@ class TimerManager: NSObject, ObservableObject {
     
     #if os(iOS)
     private func startOrUpdateLiveActivity(isRunning liveActivityIsRunning: Bool? = nil) {
+        // targetDate 是這次倒數真正的結束時間。
+        // 如果 targetDate 暫時不存在，就用目前剩餘秒數推算一個 endDate，避免 Live Activity 沒有時間資料。
         let endDate = targetDate ?? Date().addingTimeInterval(timeRemaining)
+        
+        // 把 TimerManager 的狀態交給 ActivityKit manager。
+        // Widget Extension 不會直接讀 TimerManager，只會收到這裡送出去的 ContentState。
         EyeCareLiveActivityManager.shared.startOrUpdate(
             step: currentStep,
             remainingSeconds: timeRemaining,
@@ -317,6 +324,8 @@ class TimerManager: NSObject, ObservableObject {
     }
     
     private func updateLiveActivityIfNeeded() {
+        // 畫面 timer 每 0.2 秒更新一次，但 Live Activity 不需要那麼密。
+        // 這裡用 ceil 後的整秒作比較，確保同一秒內只更新一次 ActivityKit。
         let currentSecond = max(0, Int(ceil(timeRemaining)))
         guard currentSecond != lastLiveActivityUpdateSecond else { return }
         lastLiveActivityUpdateSecond = currentSecond

@@ -4,31 +4,52 @@ import SwiftUI
 
 // MARK: - iOS Lock Screen Live Activity 資料
 
-// Live Activity 的 attributes 要同 Widget Extension 使用同一個型別名稱和欄位。
-// App 負責建立 / 更新資料；Widget Extension 負責把資料畫到 Lock Screen。
+// Live Activity 分成兩邊：
+// 1. App target：負責建立 Activity、定期更新倒數資料、結束 Activity。
+// 2. Widget Extension target：負責把這些資料畫成 Lock Screen / Dynamic Island UI。
+//
+// 兩邊都要宣告相同名稱、相同欄位的 Attributes 型別。
+// ActivityKit 會用這個型別把 App 傳出的資料交給 Widget Extension。
 struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
+    // ContentState 是「會隨時間改變」的資料。
+    // 例如剩餘秒數、是否正在響鈴、目前階段名稱，都會在倒數途中更新。
     public struct ContentState: Codable, Hashable {
+        // 顯示目前階段，例如「專注工作」、「遠眺放鬆」。
         var stepName: String
+        // Widget Extension 不直接認識 TimerStep enum，所以用簡單字串傳主題色。
         var themeName: String
+        // 倒數開始時間；目前主要保留作狀態資料，方便日後改成系統 timer renderer。
         var startDate: Date
+        // 倒數目標結束時間；目前主要用來描述這段倒數何時結束。
         var endDate: Date
+        // 剩餘秒數。Widget 會用它格式化成 m:ss。
         var remainingSeconds: Double
+        // true 代表計時器正在跑；false 代表暫停或已完成。
         var isRunning: Bool
+        // true 代表倒數已完成並進入響鈴 / 等待確認狀態。
         var isAlarming: Bool
     }
     
+    // Attributes 本身是「建立 Activity 後通常不變」的資料。
+    // 這裡只放標題，真正會跳動的資料放在 ContentState。
     var title: String
 }
 
 @MainActor
 final class EyeCareLiveActivityManager {
+    // Live Activity 管理器用 singleton，讓 TimerManager 可以集中呼叫同一個入口。
     static let shared = EyeCareLiveActivityManager()
     
     private init() {}
     
+    // 建立或更新 Live Activity。
+    // TimerManager 每次開始、暫停、每秒倒數更新時，都會呼叫這個方法同步狀態。
     func startOrUpdate(step: TimerStep, remainingSeconds: Double, endDate: Date, isRunning: Bool, isAlarming: Bool) {
+        // 使用者可以在系統設定關閉 Live Activities。
+        // 如果關閉，就不要嘗試建立，避免無謂工作或錯誤。
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         
+        // 先把 App 內部的 TimerStep / timeRemaining 轉成 ActivityKit 能傳給 Widget 的 ContentState。
         let state = makeState(
             step: step,
             remainingSeconds: remainingSeconds,
@@ -38,10 +59,13 @@ final class EyeCareLiveActivityManager {
         )
         
         Task {
+            // 同一時間這個 App 只需要一個 Live Activity。
+            // 如果已經存在，就更新它；如果不存在，才建立新的。
             if let activity = Activity<EyeCareTimerLiveActivityAttributes>.activities.first {
                 await activity.update(ActivityContent(state: state, staleDate: nil))
             } else {
                 do {
+                    // attributes 是固定資料；content 裡面的 state 才是會持續更新的倒數狀態。
                     let attributes = EyeCareTimerLiveActivityAttributes(title: "20-20-20")
                     _ = try Activity.request(
                         attributes: attributes,
@@ -55,6 +79,8 @@ final class EyeCareLiveActivityManager {
         }
     }
     
+    // 立即結束所有 20-20-20 Live Activity。
+    // 重置計時器、進入下一階段時會用到，避免 Lock Screen 留住舊倒數。
     func end() {
         Task {
             for activity in Activity<EyeCareTimerLiveActivityAttributes>.activities {
@@ -63,6 +89,8 @@ final class EyeCareLiveActivityManager {
         }
     }
     
+    // 倒數完成時呼叫。
+    // 這裡不直接 dismiss，而是先把 Live Activity 更新成「時間到」狀態。
     func finishAndEnd(step: TimerStep) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         
@@ -83,7 +111,10 @@ final class EyeCareLiveActivityManager {
         }
     }
     
+    // 將 App 內部的 TimerStep 和倒數秒數，整理成 Widget Extension 使用的 ContentState。
     private func makeState(step: TimerStep, remainingSeconds: Double, endDate: Date, isRunning: Bool, isAlarming: Bool) -> EyeCareTimerLiveActivityAttributes.ContentState {
+        // startDate 用 endDate 減去 duration 推算。
+        // max(1, remainingSeconds) 避免剩餘時間為 0 時產生 startDate == endDate 的邊界問題。
         let duration = max(1, remainingSeconds)
         let startDate = endDate.addingTimeInterval(-duration)
         
@@ -98,6 +129,8 @@ final class EyeCareLiveActivityManager {
         )
     }
     
+    // Widget Extension 只收到字串 themeName，再由 themeColor(_:) 轉成 Color。
+    // 這樣可以避免在 extension target 重複依賴 App 內的 TimerStep enum 實作細節。
     private func themeName(for step: TimerStep) -> String {
         switch step {
         case .eyeCare:
