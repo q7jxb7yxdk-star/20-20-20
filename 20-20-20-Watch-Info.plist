@@ -33,5 +33,7 @@
 	</array>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>com.sunny.eyecaretimer</string>
+	<key>WKRunsIndependentlyOfCompanionApp</key>
+	<false/>
 </dict>
 </plist>
