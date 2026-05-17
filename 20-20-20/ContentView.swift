@@ -12,7 +12,7 @@ struct ContentView: View {
     // @StateObject 代表 SwiftUI 會替這個 View 持有 TimerManager 的生命週期。
     // 如果改用 @ObservedObject，畫面重建時可能會重新建立 manager，導致倒數狀態遺失。
     @StateObject private var manager = TimerManager() // 引用核心大腦
-    @AppStorage(AppConfiguration.DefaultsKey.languageCode) private var appLanguageCode = AppLanguage.systemPreferred.rawValue
+    @AppStorage(AppConfiguration.DefaultsKey.languageCode) private var appLanguageCode = AppLanguage.systemPreferenceValue
     
     var body: some View {
         let _ = appLanguageCode

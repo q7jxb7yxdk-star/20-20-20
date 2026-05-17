@@ -13,12 +13,17 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case english = "en"
     case traditionalChinese = "zh-Hant"
     
+    /// macOS Settings 使用這個值代表「跟隨系統語言」。
+    ///
+    /// 它不是一種真正的 UI 語言；App 會在讀到這個值時再用 `systemPreferred` 判斷實際顯示英文或繁體中文。
+    nonisolated static let systemPreferenceValue = "system"
+    
     var id: String { rawValue }
     
     var displayName: String {
         switch self {
         case .english: return "English"
-        case .traditionalChinese: return "中文"
+        case .traditionalChinese: return "繁體中文"
         }
     }
     
@@ -38,6 +43,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         // 這裡直接使用 literal key，是為了避開 Swift 6 default MainActor isolation
         // 對 static property 的限制；這個 key 必須和 AppConfiguration.DefaultsKey.languageCode 相同。
         let rawValue = UserDefaults.standard.string(forKey: "app_language_code")
+        
+        // 沒有手動選擇語言，或選了「跟隨系統」時，才真正按 macOS / iOS 系統語言決定 UI。
+        if rawValue == nil || rawValue == systemPreferenceValue {
+            return systemPreferred
+        }
+        
         return AppLanguage(rawValue: rawValue ?? "") ?? systemPreferred
     }
 }
@@ -100,6 +111,13 @@ enum AppText {
         switch language {
         case .english: return "Language"
         case .traditionalChinese: return "語言"
+        }
+    }
+    
+    nonisolated static var followSystemLanguageName: String {
+        switch language {
+        case .english: return "Follow System"
+        case .traditionalChinese: return "跟隨系統"
         }
     }
     

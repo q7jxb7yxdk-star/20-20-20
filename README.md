@@ -1,4 +1,4 @@
-# 20-20-20
+# 20-20-20 README
 
 `20-20-20` is a cross-platform eye-care timer for iOS, macOS, and watchOS. It helps users follow the 20-20-20 rule: work for 20 minutes, look far away for 20 seconds, then continue through a longer rest cycle.
 

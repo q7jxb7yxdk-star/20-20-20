@@ -5,7 +5,7 @@ struct SettingsView: View {
     // @AppStorage 會直接讀寫 UserDefaults。
     // 這裡使用同一個 key，所以 macOS App Settings 和 iOS Settings.bundle 都會影響 AppConfiguration.runMode。
     @AppStorage(AppConfiguration.DefaultsKey.runMode) private var runMode = AppConfiguration.RunMode.release.rawValue
-    @AppStorage(AppConfiguration.DefaultsKey.languageCode) private var languageCode = AppLanguage.systemPreferred.rawValue
+    @AppStorage(AppConfiguration.DefaultsKey.languageCode) private var languageCode = AppLanguage.systemPreferenceValue
     
     private var selectedMode: AppConfiguration.RunMode {
         AppConfiguration.RunMode(rawValue: runMode) ?? .release
@@ -28,6 +28,8 @@ struct SettingsView: View {
             Divider()
             
             Picker(AppText.languageLabel, selection: $languageCode) {
+                Text(AppText.followSystemLanguageName).tag(AppLanguage.systemPreferenceValue)
+                
                 ForEach(AppLanguage.allCases) { language in
                     Text(language.displayName).tag(language.rawValue)
                 }
