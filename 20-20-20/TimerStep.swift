@@ -68,7 +68,6 @@ enum AppConfiguration {
     enum DefaultsKey {
         nonisolated static let runMode = "app_run_mode"
         nonisolated static let languageCode = "app_language_code"
-        nonisolated static let didMigrateLanguageToFollowSystem = "did_migrate_language_to_follow_system"
     }
     
     // typealias 可以把一組複雜型別取一個好懂的名字。
@@ -81,17 +80,6 @@ enum AppConfiguration {
         UserDefaults.standard.register(defaults: [
             DefaultsKey.runMode: RunMode.release.rawValue
         ])
-        
-        migrateLanguageDefaultToFollowSystem()
-    }
-    
-    private static func migrateLanguageDefaultToFollowSystem() {
-        // 早期版本曾經把 app_language_code 預設成固定語言，會令 macOS 不能自動跟隨系統。
-        // 這個一次性 migration 會清走舊語言值，讓 App 回到「跟隨系統」。
-        guard !UserDefaults.standard.bool(forKey: DefaultsKey.didMigrateLanguageToFollowSystem) else { return }
-        
-        UserDefaults.standard.removeObject(forKey: DefaultsKey.languageCode)
-        UserDefaults.standard.set(true, forKey: DefaultsKey.didMigrateLanguageToFollowSystem)
     }
     
     static var runMode: RunMode {

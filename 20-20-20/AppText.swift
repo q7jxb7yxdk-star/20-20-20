@@ -13,9 +13,9 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case english = "en"
     case traditionalChinese = "zh-Hant"
     
-    /// macOS Settings 使用這個值代表「跟隨系統語言」。
+    /// 舊版本曾經用這個值代表「跟隨系統語言」。
     ///
-    /// 它不是一種真正的 UI 語言；App 會在讀到這個值時再用 `systemPreferred` 判斷實際顯示英文或繁體中文。
+    /// 現在 Settings 不再顯示這個選項，但保留讀取能力，避免已經儲存舊值的使用者出現語言判斷錯誤。
     nonisolated static let systemPreferenceValue = "system"
     
     var id: String { rawValue }
@@ -44,7 +44,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         // 對 static property 的限制；這個 key 必須和 AppConfiguration.DefaultsKey.languageCode 相同。
         let rawValue = UserDefaults.standard.string(forKey: "app_language_code")
         
-        // 沒有手動選擇語言，或選了「跟隨系統」時，才真正按 macOS / iOS 系統語言決定 UI。
+        // 沒有手動選擇語言時，按 macOS / iOS 系統語言決定 UI。
+        // 如果讀到舊版本留下的 "system"，也同樣當成自動跟隨系統。
         if rawValue == nil || rawValue == systemPreferenceValue {
             return systemPreferred
         }
@@ -111,13 +112,6 @@ enum AppText {
         switch language {
         case .english: return "Language"
         case .traditionalChinese: return "語言"
-        }
-    }
-    
-    nonisolated static var followSystemLanguageName: String {
-        switch language {
-        case .english: return "Follow System"
-        case .traditionalChinese: return "跟隨系統"
         }
     }
     
