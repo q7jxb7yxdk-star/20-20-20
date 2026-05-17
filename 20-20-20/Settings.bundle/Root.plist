@@ -8,23 +8,23 @@
             <key>Type</key>
             <string>PSGroupSpecifier</string>
             <key>Title</key>
-            <string>RUN_MODE_GROUP_TITLE</string>
+            <string>Run Mode</string>
             <key>FooterText</key>
-            <string>RUN_MODE_GROUP_FOOTER</string>
+            <string>Debug uses short durations for testing; Release uses normal eye-care durations.</string>
         </dict>
         <dict>
             <key>Type</key>
             <string>PSMultiValueSpecifier</string>
             <key>Title</key>
-            <string>RUN_MODE_TITLE</string>
+            <string>Mode</string>
             <key>Key</key>
             <string>app_run_mode</string>
             <key>DefaultValue</key>
             <string>release</string>
             <key>Titles</key>
             <array>
-                <string>RUN_MODE_DEBUG</string>
-                <string>RUN_MODE_RELEASE</string>
+                <string>Debug</string>
+                <string>Release</string>
             </array>
             <key>Values</key>
             <array>
@@ -36,23 +36,23 @@
             <key>Type</key>
             <string>PSGroupSpecifier</string>
             <key>Title</key>
-            <string>LANGUAGE_GROUP_TITLE</string>
+            <string>Preferred Language</string>
             <key>FooterText</key>
-            <string>LANGUAGE_GROUP_FOOTER</string>
+            <string>Choose the App UI language.</string>
         </dict>
         <dict>
             <key>Type</key>
             <string>PSMultiValueSpecifier</string>
             <key>Title</key>
-            <string>LANGUAGE_TITLE</string>
+            <string>Language</string>
             <key>Key</key>
             <string>app_language_code</string>
             <key>DefaultValue</key>
             <string>en</string>
             <key>Titles</key>
             <array>
-                <string>LANGUAGE_ENGLISH</string>
-                <string>LANGUAGE_CHINESE</string>
+                <string>English</string>
+                <string>繁體中文</string>
             </array>
             <key>Values</key>
             <array>
