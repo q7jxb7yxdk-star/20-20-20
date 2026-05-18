@@ -28,7 +28,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
     
     /// 按系統偏好語言自動判斷 App 初始語言。
-    ///
+    /// 123
     /// 使用 `Locale.preferredLanguages` 比只讀 `Locale.current` 更貼近使用者在系統設定入面的語言排序。
     nonisolated static var systemPreferred: AppLanguage {
         let preferredLanguages = Locale.preferredLanguages.map { $0.lowercased() }
