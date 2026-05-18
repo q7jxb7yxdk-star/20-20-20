@@ -1,5 +1,5 @@
 import SwiftUI           // 負責：建立 App 的畫面（按鈕、圓圈、文字等 UI 元素）
-// github test
+
 // 根據不同的作業系統，引入專屬的系統工具箱
 #if os(iOS)
 import UIKit             // 負責：iOS 系統的底層工具（如螢幕震動、系統背景管理）
