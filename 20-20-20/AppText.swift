@@ -43,6 +43,11 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         // 這裡直接使用 literal key，是為了避開 Swift 6 default MainActor isolation
         // 對 static property 的限制；這個 key 必須和 AppConfiguration.DefaultsKey.languageCode 相同。
         let rawValue = UserDefaults.standard.string(forKey: "app_language_code")
+        let source = UserDefaults.standard.string(forKey: "app_language_source")
+        
+        if source == "auto" {
+            return systemPreferred
+        }
         
         // 沒有手動選擇語言時，按 macOS / iOS 系統語言決定 UI。
         // 如果讀到舊版本留下的 "system"，也同樣當成自動跟隨系統。

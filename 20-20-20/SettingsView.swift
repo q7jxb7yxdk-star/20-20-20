@@ -11,6 +11,20 @@ struct SettingsView: View {
         AppConfiguration.RunMode(rawValue: runMode) ?? .release
     }
     
+    private var languageSelection: Binding<String> {
+        Binding(
+            get: {
+                languageCode
+            },
+            set: { newValue in
+                // Picker 寫入語言前，先標記成手動選擇。
+                // 這樣 AppText.current 重新計算時會立即使用新語言，而不是仍然按 auto/system 判斷。
+                AppConfiguration.markLanguageManuallySelected(newValue)
+                languageCode = newValue
+            }
+        )
+    }
+    
     var body: some View {
         Form {
             Picker(AppText.runModeLabel, selection: $runMode) {
@@ -27,7 +41,7 @@ struct SettingsView: View {
             
             Divider()
             
-            Picker(AppText.languageLabel, selection: $languageCode) {
+            Picker(AppText.languageLabel, selection: languageSelection) {
                 ForEach(AppLanguage.allCases) { language in
                     Text(language.displayName).tag(language.rawValue)
                 }
