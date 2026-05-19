@@ -107,6 +107,38 @@ TECHNICAL_DOCUMENTATION.md
 
 That file explains the countdown architecture, platform differences, Live Activity behavior, Watch smart alarm behavior, and common Xcode Debug Area messages.
 
+## Git Workflow
+
+The project currently uses:
+
+- Local branch: `main`
+- GitHub remote branch: `master`
+
+Because the branch names are different, pushing from Terminal should use:
+
+```bash
+git push origin HEAD:master
+```
+
+Recommended safe flow:
+
+```bash
+git status
+git add <changed-file-path>
+git commit -m "Short commit message"
+git push origin HEAD:master
+```
+
+For example:
+
+```bash
+git add 20-20-20/AppText.swift 20-20-20/SettingsView.swift
+git commit -m "Fix language preference sync"
+git push origin HEAD:master
+```
+
+Use `git add -A` only when you have checked `git status` and really want to include all modified, added, deleted, and moved files.
+
 ## Notes
 
 - iOS Settings may show system-managed items such as Mobile Data. Those are added by iOS and are not controlled by `Settings.bundle`.

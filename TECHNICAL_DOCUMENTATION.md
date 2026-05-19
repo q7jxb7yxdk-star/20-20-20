@@ -417,7 +417,106 @@ Build macOS from terminal:
 xcodebuild -project /Users/sunnyyu/Documents/Xcode/20-20-20/20-20-20.xcodeproj -scheme 20-20-20 -destination 'generic/platform=macOS' build
 ```
 
-## 22. Installation Notes
+## 22. Git Workflow Notes
+
+This project currently keeps the local branch name as `main`, while the GitHub remote branch is `master`.
+
+That is allowed, but it means a plain `git push` may fail with a warning that the upstream branch name does not match the local branch name.
+
+Use this command when pushing:
+
+```bash
+git push origin HEAD:master
+```
+
+Meaning:
+
+- `origin`: the GitHub remote.
+- `HEAD`: the latest commit on the current local branch.
+- `master`: the remote branch to update.
+
+### Check What Changed
+
+Use the full status command when learning:
+
+```bash
+git status
+```
+
+It explains the current branch, staged files, unstaged files, untracked files, and suggested next commands.
+
+Use the short version when you want a compact view:
+
+```bash
+git status --short --branch
+```
+
+Example output:
+
+```text
+## main...origin/master
+ M 20-20-20/AppText.swift
+ M 20-20-20/SettingsView.swift
+```
+
+Common short status symbols:
+
+| Symbol | Meaning |
+| --- | --- |
+| ` M file` | Modified, not staged yet. |
+| `M  file` | Modified and already staged. |
+| `A  file` | New file staged. |
+| `D  file` | Deleted file. |
+| `?? file` | New file not tracked by Git yet. |
+
+### Add Files Safely
+
+To stage only specific files:
+
+```bash
+git add 20-20-20/AppText.swift 20-20-20/SettingsView.swift 20-20-20/TimerStep.swift
+```
+
+This is safer when you only want to commit a known set of files.
+
+To stage every change in the repository:
+
+```bash
+git add -A
+```
+
+`git add -A` includes:
+
+- modified files
+- newly created files
+- deleted files
+- renamed or moved files
+
+Use it only after checking `git status`, because it can include unrelated changes.
+
+### Commit and Push
+
+Typical safe Terminal flow:
+
+```bash
+git status
+git add <changed-file-path>
+git status
+git commit -m "Short commit message"
+git push origin HEAD:master
+```
+
+Example:
+
+```bash
+git add 20-20-20/AppText.swift 20-20-20/SettingsView.swift 20-20-20/TimerStep.swift
+git commit -m "Fix language preference sync"
+git push origin HEAD:master
+```
+
+Xcode's Commit and Push UI uses Git underneath. If Xcode commits locally but GitHub does not update, check whether the local branch and remote branch names are different.
+
+## 23. Installation Notes
 
 macOS archive flow:
 
@@ -439,7 +538,7 @@ Watch development install:
 4. Select the paired Watch destination in Xcode.
 5. Run the Watch app scheme or the main app scheme with embedded Watch app.
 
-## 23. Comment Style
+## 24. Comment Style
 
 Use `//` for normal comments:
 
@@ -457,7 +556,7 @@ Use `///` for documentation comments:
 
 In Xcode, hold `Option` and click a documented symbol to see Quick Help.
 
-## 24. Future Improvements
+## 25. Future Improvements
 
 Possible future work:
 
