@@ -313,6 +313,33 @@ class TimerManager: NSObject, ObservableObject {
         triggerHaptic()
     }
     
+    #if os(macOS)
+    // Select a specific cycle step from the macOS step dots.
+    // This resets the selected step to its full duration and leaves the timer paused.
+    func selectStep(_ step: TimerStep) {
+        isRunning = false
+        isAlarming = false
+        targetDate = nil
+        currentStep = step
+        timeRemaining = Double(step.seconds)
+        stopAlarmSound()
+        cancelNotifications()
+        triggerHaptic()
+    }
+    
+    func selectPreviousStep() {
+        let allSteps = TimerStep.allCases
+        let previousIndex = (currentStep.rawValue - 1 + allSteps.count) % allSteps.count
+        selectStep(allSteps[previousIndex])
+    }
+    
+    func selectNextStep() {
+        let allSteps = TimerStep.allCases
+        let nextIndex = (currentStep.rawValue + 1) % allSteps.count
+        selectStep(allSteps[nextIndex])
+    }
+    #endif
+    
     #if os(iOS)
     private func handleLiveActivityControlCommandIfNeeded() {
         guard !isCheckingLiveActivityCommand else { return }

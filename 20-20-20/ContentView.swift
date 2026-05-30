@@ -36,6 +36,12 @@ struct ContentView: View {
         #if os(macOS)
         .frame(minWidth: 400, minHeight: 600) // Mac 版視窗大小
         .background(WindowInitialSizeConfigurator(width: 400, height: 600))
+        .background(MacKeyboardCycleController(
+            onLeftArrow: manager.selectPreviousStep,
+            onRightArrow: manager.selectNextStep,
+            onStartPause: performPrimaryTimerAction,
+            onReset: manager.reset
+        ))
         #endif
         .onAppear { manager.setupOnLaunch() } // 畫面加載完成後進行權限請求
         #if os(iOS)
@@ -78,6 +84,90 @@ struct WindowInitialSizeConfigurator: NSViewRepresentable {
     
     class Coordinator {
         var didConfigure = false
+    }
+}
+
+struct MacKeyboardCycleController: NSViewRepresentable {
+    let onLeftArrow: () -> Void
+    let onRightArrow: () -> Void
+    let onStartPause: () -> Void
+    let onReset: () -> Void
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            onLeftArrow: onLeftArrow,
+            onRightArrow: onRightArrow,
+            onStartPause: onStartPause,
+            onReset: onReset
+        )
+    }
+    
+    func makeNSView(context: Context) -> NSView {
+        context.coordinator.installMonitor()
+        return NSView()
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onLeftArrow = onLeftArrow
+        context.coordinator.onRightArrow = onRightArrow
+        context.coordinator.onStartPause = onStartPause
+        context.coordinator.onReset = onReset
+        context.coordinator.installMonitor()
+    }
+    
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.removeMonitor()
+    }
+    
+    class Coordinator {
+        var onLeftArrow: () -> Void
+        var onRightArrow: () -> Void
+        var onStartPause: () -> Void
+        var onReset: () -> Void
+        private var monitor: Any?
+        
+        init(
+            onLeftArrow: @escaping () -> Void,
+            onRightArrow: @escaping () -> Void,
+            onStartPause: @escaping () -> Void,
+            onReset: @escaping () -> Void
+        ) {
+            self.onLeftArrow = onLeftArrow
+            self.onRightArrow = onRightArrow
+            self.onStartPause = onStartPause
+            self.onReset = onReset
+        }
+        
+        func installMonitor() {
+            guard monitor == nil else { return }
+            
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else { return event }
+                
+                switch event.keyCode {
+                case 123:
+                    self.onLeftArrow()
+                    return nil
+                case 124:
+                    self.onRightArrow()
+                    return nil
+                case 49:
+                    self.onStartPause()
+                    return nil
+                case 15:
+                    self.onReset()
+                    return nil
+                default:
+                    return event
+                }
+            }
+        }
+        
+        func removeMonitor() {
+            guard let monitor else { return }
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
     }
 }
 #endif
@@ -181,13 +271,7 @@ extension ContentView {
     private func actionControls(buttonSize: CGFloat) -> some View {
         HStack(spacing: max(24, buttonSize * 0.45)) {
             Button(action: {
-                // 同一顆主按鈕在不同狀態下做不同事：
-                // 響鈴時是「確認並進下一階段」，平常是「開始/暫停」。
-                if manager.isAlarming {
-                    manager.nextStep() // 響鈴時點一下進入下一關
-                } else {
-                    manager.toggle()   // 平常點一下切換暫停/開始
-                }
+                performPrimaryTimerAction()
             }) {
                 ZStack {
                     Circle()
@@ -221,17 +305,42 @@ extension ContentView {
         .frame(height: buttonSize * 1.2)
     }
     
+    private func performPrimaryTimerAction() {
+        // 同一顆主按鈕在不同狀態下做不同事：
+        // 響鈴時是「確認並進下一階段」，平常是「開始/暫停」。
+        if manager.isAlarming {
+            manager.nextStep() // 響鈴時點一下進入下一關
+        } else {
+            manager.toggle()   // 平常點一下切換暫停/開始
+        }
+    }
+    
     // 進度圓點組件
     private var stepDots: some View {
         HStack(spacing: 10) {
             // ForEach 會依序產生四個小點，對應 TimerStep 的四個階段。
-            ForEach(0..<TimerStep.allCases.count, id: \.self) { index in
-                Circle()
-                    .fill(manager.currentStep.rawValue == index ? manager.currentStep.themeColor : Color.gray.opacity(0.2))
-                    .frame(width: 8, height: 8)
-                    .animation(.spring(), value: manager.currentStep)
+            ForEach(TimerStep.allCases, id: \.rawValue) { step in
+                #if os(macOS)
+                Button {
+                    manager.selectStep(step)
+                } label: {
+                    stepDot(for: step)
+                }
+                .buttonStyle(.plain)
+                .help(step.name)
+                #else
+                stepDot(for: step)
+                #endif
             }
         }
+    }
+    
+    private func stepDot(for step: TimerStep) -> some View {
+        Circle()
+            .fill(manager.currentStep == step ? manager.currentStep.themeColor : Color.gray.opacity(0.2))
+            .frame(width: 8, height: 8)
+            .contentShape(Circle())
+            .animation(.spring(), value: manager.currentStep)
     }
     
     // 控制按鈕圖示變換

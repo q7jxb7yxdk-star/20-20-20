@@ -9,6 +9,7 @@ This repository is also used as a learning project, so the Swift files include m
 - Four-step eye-care countdown cycle.
 - Circular countdown progress UI.
 - Start, pause, reset, and confirm-next-step controls.
+- macOS step-dot and keyboard cycle controls.
 - Debug and Release run modes.
 - English and Traditional Chinese UI language support.
 - iOS Lock Screen / Dynamic Island Live Activity with system-rendered countdown time.
@@ -69,6 +70,13 @@ Available settings:
 - `Preferred Language`: `English` / `繁體中文`
 
 On macOS, settings are available from the App Settings window.
+
+macOS controls:
+
+- Click a step dot to jump directly to that cycle step.
+- Press `Left Arrow` / `Right Arrow` to move to the previous / next cycle step.
+- Press `Space` to start, pause, or confirm the completed step.
+- Press `R` to reset.
 
 The App UI language is stored with:
 
