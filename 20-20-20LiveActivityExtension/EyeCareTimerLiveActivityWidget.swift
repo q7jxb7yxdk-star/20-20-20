@@ -246,6 +246,15 @@ private struct LiveActivityTimerText: View {
                 return 0.7
             }
         }
+        
+        var height: CGFloat? {
+            switch self {
+            case .lockScreen:
+                return 62
+            default:
+                return nil
+            }
+        }
     }
     
     let state: EyeCareTimerLiveActivityAttributes.ContentState
@@ -268,7 +277,7 @@ private struct LiveActivityTimerText: View {
         .monospacedDigit()
         .lineLimit(1)
         .minimumScaleFactor(style.minimumScaleFactor)
-        .frame(width: style.width, alignment: .trailing)
+        .frame(width: style.width, height: style.height, alignment: .trailing)
     }
     
     private var font: Font {

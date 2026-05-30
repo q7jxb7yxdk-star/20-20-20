@@ -286,8 +286,14 @@ The time UI is centralized in `LiveActivityTimerText`. It owns:
 - Normal countdown text.
 - Paused and alarming text.
 - Fixed-width right alignment for Lock Screen and Dynamic Island variants.
+- A fixed Lock Screen time container height to reduce visual jumps between running and paused text.
+- Separate style values for Lock Screen, Dynamic Island compact, and Dynamic Island expanded layouts.
 
 Keeping these states inside one component keeps Lock Screen and Dynamic Island timer layout consistent.
+
+Dynamic Island keeps using `Text(timerInterval:)` for running time so the compact countdown remains system-rendered. Lock Screen also uses the system timer renderer for running time, while paused and alarming states use fixed text.
+
+The App only updates the Live Activity at state transitions such as start, pause, resume, reset, next step, and time up. It does not update the Activity every display tick.
 
 ## 16. Live Activity Buttons
 
