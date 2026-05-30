@@ -251,27 +251,13 @@ private struct LiveActivityTimerText: View {
     let state: EyeCareTimerLiveActivityAttributes.ContentState
     let style: Style
     
-    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
-    
     var body: some View {
         ZStack(alignment: .trailing) {
             if state.isAlarming {
                 // 已經響鈴時固定顯示 0:00，避免倒數完成後繼續顯示負數或舊時間。
                 Text("0:00")
-            } else if state.isRunning && isLuminanceReduced {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    let remainingSeconds = max(0, state.endDate.timeIntervalSince(context.date))
-                    
-                    if remainingSeconds > 60 {
-                        // Always-On / 低亮度狀態先隱藏秒數，減少鎖屏長時間顯示時的跳動感。
-                        Text(maskedLiveActivityTimeText(from: remainingSeconds))
-                    } else {
-                        // 正常顯示或最後 1 分鐘，交給系統 timer renderer 持續倒數。
-                        Text(timerInterval: state.startDate...state.endDate, countsDown: true)
-                    }
-                }
             } else if state.isRunning {
-                // 正常 Lock Screen / Dynamic Island 直接用系統 timer renderer，避免 App 每秒重繪造成閃爍。
+                // Running 狀態直接用系統 timer renderer，讓 active / inactive Lock Screen 都由系統持續倒數。
                 Text(timerInterval: state.startDate...state.endDate, countsDown: true)
             } else {
                 // 暫停時顯示固定剩餘時間，避免 pause 後畫面繼續跳秒。
@@ -306,12 +292,6 @@ private func detailedLiveActivityTimeText(from seconds: Double) -> String {
     let minutes = totalSeconds / 60
     let seconds = totalSeconds % 60
     return String(format: "%d:%02d", minutes, seconds)
-}
-
-private func maskedLiveActivityTimeText(from seconds: Double) -> String {
-    let totalSeconds = max(0, Int(ceil(seconds)))
-    let minutes = totalSeconds / 60
-    return String(format: "%d:--", minutes)
 }
 
 private func themeColor(_ name: String) -> Color {

@@ -51,9 +51,6 @@ class TimerManager: NSObject, ObservableObject {
     // iOS 從 Settings App 回來時會連續收到 willEnterForeground / didBecomeActive。
     // 保存延遲刷新 Task，讓新事件可以取消舊事件，避免短時間內重複刷新多次。
     private var settingsRefreshTask: Task<Void, Never>?
-    // Live Activity running 狀態由 WidgetKit timer renderer 根據 endDate 自行倒數。
-    // App 仍節流更新 remainingSeconds，讓暫停、按鈕 intent 和狀態同步有準確資料。
-    private var lastLiveActivityUpdateSecond: Int?
     // 記住最後處理過的 Live Activity 按鈕命令，避免同一次按鈕被重複執行。
     private var lastHandledLiveActivityCommandID: UUID?
     // 防止讀取 command 時又被 Timer tick 重入，令同一瞬間建立太多 Task。
@@ -119,11 +116,6 @@ class TimerManager: NSObject, ObservableObject {
         
         if diff > 0 {
             timeRemaining = diff // 更新剩餘時間
-            #if os(iOS)
-            // Live Activity running 畫面會用 endDate 自行倒數。
-            // 這裡仍定期同步 remainingSeconds，方便暫停與互動按鈕取得最新狀態。
-            updateLiveActivityIfNeeded()
-            #endif
         } else if isRunning {
             // diff <= 0 表示已經到達或超過目標時間；此時切到響鈴狀態。
             triggerAlarm() // 歸零，觸發鬧鐘
@@ -245,7 +237,6 @@ class TimerManager: NSObject, ObservableObject {
         #else
         let token = UUID()
         alarmSchedulingToken = token
-        lastLiveActivityUpdateSecond = nil
         startOrUpdateLiveActivity()
         // AlarmKit API 是 async，所以放進 Task。
         // expectedToken 讓排程完成時能確認它仍然是最新那次開始操作。
@@ -363,14 +354,6 @@ class TimerManager: NSObject, ObservableObject {
         )
     }
     
-    private func updateLiveActivityIfNeeded() {
-        // 畫面 timer 每 0.2 秒更新一次，但 Live Activity 不需要那麼密。
-        // 這裡用 ceil 後的整秒作比較，確保同一秒內只更新一次 ActivityKit。
-        let currentSecond = max(0, Int(ceil(timeRemaining)))
-        guard currentSecond != lastLiveActivityUpdateSecond else { return }
-        lastLiveActivityUpdateSecond = currentSecond
-        startOrUpdateLiveActivity()
-    }
     #endif
 
     // 播放提醒聲
