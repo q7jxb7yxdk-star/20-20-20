@@ -267,11 +267,33 @@ Main files:
 
 Current display behavior:
 
-- Lock Screen: full `m:ss` countdown.
-- Dynamic Island compact: full countdown with constrained size.
-- Dynamic Island expanded: full countdown and `20-20-20` label.
+- Normal Lock Screen / Dynamic Island: full `m:ss` countdown.
+- Reduced-luminance / Always-On style Lock Screen: `m:--` while more than 60 seconds remain.
+- Final 60 seconds: full `m:ss` countdown in both normal and reduced-luminance states.
+- Paused state: fixed remaining time.
+- Alarming state: fixed `0:00`.
 
-The earlier idea of showing `m:--` until the Lock Screen is touched is not implemented because ActivityKit does not expose an API to tell whether the user has touched or woken the Lock Screen.
+Running Live Activity time is based on `startDate` and `endDate`. The widget uses SwiftUI's system timer renderer:
+
+```swift
+Text(timerInterval: state.startDate...state.endDate, countsDown: true)
+```
+
+This lets the Lock Screen continue counting down after the App process enters the background. The App should not push a new Live Activity state every second while running, because repeated ActivityKit updates can make the Lock Screen timer redraw or flash.
+
+`remainingSeconds` is still kept in the Activity state for paused display and interactive button calculations.
+
+Reduced-luminance behavior uses SwiftUI's `isLuminanceReduced` environment value. The App cannot directly know whether the user has touched or woken the Lock Screen, so reduced luminance is used as the practical signal for the quiet `m:--` display.
+
+The time UI is centralized in `LiveActivityTimerText`. It owns:
+
+- Normal countdown text.
+- Reduced-luminance `m:--` text.
+- Final-minute full countdown.
+- Paused and alarming text.
+- Fixed-width right alignment for Lock Screen and Dynamic Island variants.
+
+Keeping these states inside one component prevents the full countdown and masked `m:--` text from drifting to different positions.
 
 ## 16. Live Activity Buttons
 

@@ -51,8 +51,8 @@ class TimerManager: NSObject, ObservableObject {
     // iOS 從 Settings App 回來時會連續收到 willEnterForeground / didBecomeActive。
     // 保存延遲刷新 Task，讓新事件可以取消舊事件，避免短時間內重複刷新多次。
     private var settingsRefreshTask: Task<Void, Never>?
-    // Live Activity 使用靜態文字顯示剩餘時間，避免 Simulator SpringBoard 在系統 timer renderer 歸零時崩潰。
-    // 這裡節流到每秒更新一次，避免每 0.2 秒都呼叫 ActivityKit。
+    // Live Activity running 狀態由 WidgetKit timer renderer 根據 endDate 自行倒數。
+    // App 仍節流更新 remainingSeconds，讓暫停、按鈕 intent 和狀態同步有準確資料。
     private var lastLiveActivityUpdateSecond: Int?
     // 記住最後處理過的 Live Activity 按鈕命令，避免同一次按鈕被重複執行。
     private var lastHandledLiveActivityCommandID: UUID?
@@ -120,8 +120,8 @@ class TimerManager: NSObject, ObservableObject {
         if diff > 0 {
             timeRemaining = diff // 更新剩餘時間
             #if os(iOS)
-            // Live Activity 顯示的是 App 傳入的 remainingSeconds。
-            // 所以倒數進行中要定期把新的秒數同步到 Lock Screen / Dynamic Island。
+            // Live Activity running 畫面會用 endDate 自行倒數。
+            // 這裡仍定期同步 remainingSeconds，方便暫停與互動按鈕取得最新狀態。
             updateLiveActivityIfNeeded()
             #endif
         } else if isRunning {

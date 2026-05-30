@@ -20,11 +20,11 @@ nonisolated struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
         var stepIndex: Int
         // Widget Extension 不直接認識 TimerStep enum，所以用簡單字串傳主題色。
         var themeName: String
-        // 倒數開始時間；目前主要保留作狀態資料，方便日後改成系統 timer renderer。
+        // 倒數開始時間；Widget 會連同 endDate 交給系統 timer renderer 顯示持續倒數。
         var startDate: Date
-        // 倒數目標結束時間；目前主要用來描述這段倒數何時結束。
+        // 倒數目標結束時間；App 進入背景後，Live Activity 仍可靠這個時間點繼續倒數。
         var endDate: Date
-        // 剩餘秒數。Widget 會用它格式化成 m:ss。
+        // 剩餘秒數。Widget 在暫停狀態和按鈕 intent 會用它計算 / 格式化成 m:ss。
         var remainingSeconds: Double
         // true 代表計時器正在跑；false 代表暫停或已完成。
         var isRunning: Bool

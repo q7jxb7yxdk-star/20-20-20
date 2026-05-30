@@ -9,7 +9,8 @@ import WidgetKit
 // App target 會把 ContentState 傳給 ActivityKit；Widget Extension 會收到同一份 state 來畫 UI。
 nonisolated struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
     // ContentState 是會被 App 不斷更新的資料。
-    // Live Activity 不是自己跑 Timer，而是靠 App 定期推送新的 remainingSeconds。
+    // 倒數進行中時，Widget 會用 endDate 交給系統 timer renderer 顯示持續倒數。
+    // remainingSeconds 主要用於暫停狀態和按鈕 intent 計算。
     public struct ContentState: Codable, Hashable {
         // 目前階段名稱，例如「專注工作」。
         var stepName: String
@@ -17,10 +18,10 @@ nonisolated struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
         var stepIndex: Int
         // 簡單字串形式的主題色，例如 blue / green / orange。
         var themeName: String
-        // 保留開始與結束時間，方便日後如果要改用系統 timer renderer。
+        // 開始與結束時間用於系統 timer renderer，讓 App 進入背景後仍能繼續顯示倒數。
         var startDate: Date
         var endDate: Date
-        // 目前主要用這個值格式化成 m:ss。
+        // 暫停狀態會用這個值格式化成 m:ss。
         var remainingSeconds: Double
         // 是否正在倒數。
         var isRunning: Bool
@@ -73,12 +74,7 @@ struct EyeCareTimerLiveActivityWidget: Widget {
             } compactTrailing: {
                 // compact 狀態右邊顯示完整 m:ss。
                 // 字體和寬度要控制，否則可能遮住狀態列時間、訊號和電量。
-                detailedTimerText(for: context.state)
-                    .font(.caption2.monospacedDigit().weight(.semibold))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(maxWidth: 52, alignment: .trailing)
+                detailedTimerText(for: context.state, style: .dynamicIslandCompact)
                     .foregroundStyle(themeColor(context.state.themeName))
             } minimal: {
                 // minimal 狀態空間極少，只顯示 icon。
@@ -147,14 +143,7 @@ private struct LiveActivityLockScreenView: View {
     }
     
     private var liveActivityTime: some View {
-        detailedTimerText(for: state)
-            // monospacedDigit 令每個數字等寬，倒數跳秒時文字不會左右抖動。
-            .font(.system(size: 52, weight: .light, design: .rounded).monospacedDigit())
-            // 如果某些機型寬度不足，允許文字縮細，避免被截斷。
-            .minimumScaleFactor(0.64)
-            .lineLimit(1)
-            // 固定一個最小寬度並靠右，倒數時間視覺上會更像系統 Clock app。
-            .frame(minWidth: 118, alignment: .trailing)
+        detailedTimerText(for: state, style: .lockScreen)
             .foregroundStyle(.orange)
     }
     
@@ -173,8 +162,7 @@ private struct LiveActivityCompactView: View {
     
     var body: some View {
         VStack(spacing: 2) {
-            detailedTimerText(for: state)
-                .font(.title3.monospacedDigit().weight(.semibold))
+            detailedTimerText(for: state, style: .dynamicIslandCompactExpanded)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             
             Text(state.isAlarming ? ExtensionAppText.timeUp : state.stepName)
@@ -192,8 +180,7 @@ private struct LiveActivityExpandedView: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
             // 展開 Dynamic Island 時空間比較多，可以用較大的完整秒數倒數。
-            detailedTimerText(for: state)
-                .font(.title2.monospacedDigit().weight(.semibold))
+            detailedTimerText(for: state, style: .dynamicIslandExpanded)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             
             Text(state.isAlarming ? ExtensionAppText.timeUp : "20-20-20")
@@ -227,12 +214,88 @@ private func liveActivityIconLink<Intent: AppIntent>(systemName: String, intent:
 // MARK: - Formatting
 
 @ViewBuilder
-private func detailedTimerText(for state: EyeCareTimerLiveActivityAttributes.ContentState) -> some View {
-    if state.isAlarming {
-        // 已經響鈴時固定顯示 0:00，避免倒數完成後繼續顯示負數或舊時間。
-        Text("0:00")
-    } else {
-        Text(detailedLiveActivityTimeText(from: state.remainingSeconds))
+private func detailedTimerText(for state: EyeCareTimerLiveActivityAttributes.ContentState, style: LiveActivityTimerText.Style) -> some View {
+    LiveActivityTimerText(state: state, style: style)
+}
+
+private struct LiveActivityTimerText: View {
+    enum Style {
+        case lockScreen
+        case dynamicIslandCompact
+        case dynamicIslandCompactExpanded
+        case dynamicIslandExpanded
+        
+        var width: CGFloat {
+            switch self {
+            case .lockScreen:
+                return 140
+            case .dynamicIslandCompact:
+                return 52
+            case .dynamicIslandCompactExpanded:
+                return 72
+            case .dynamicIslandExpanded:
+                return 86
+            }
+        }
+        
+        var minimumScaleFactor: CGFloat {
+            switch self {
+            case .lockScreen:
+                return 0.64
+            default:
+                return 0.7
+            }
+        }
+    }
+    
+    let state: EyeCareTimerLiveActivityAttributes.ContentState
+    let style: Style
+    
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+    
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            if state.isAlarming {
+                // 已經響鈴時固定顯示 0:00，避免倒數完成後繼續顯示負數或舊時間。
+                Text("0:00")
+            } else if state.isRunning && isLuminanceReduced {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let remainingSeconds = max(0, state.endDate.timeIntervalSince(context.date))
+                    
+                    if remainingSeconds > 60 {
+                        // Always-On / 低亮度狀態先隱藏秒數，減少鎖屏長時間顯示時的跳動感。
+                        Text(maskedLiveActivityTimeText(from: remainingSeconds))
+                    } else {
+                        // 正常顯示或最後 1 分鐘，交給系統 timer renderer 持續倒數。
+                        Text(timerInterval: state.startDate...state.endDate, countsDown: true)
+                    }
+                }
+            } else if state.isRunning {
+                // 正常 Lock Screen / Dynamic Island 直接用系統 timer renderer，避免 App 每秒重繪造成閃爍。
+                Text(timerInterval: state.startDate...state.endDate, countsDown: true)
+            } else {
+                // 暫停時顯示固定剩餘時間，避免 pause 後畫面繼續跳秒。
+                Text(detailedLiveActivityTimeText(from: state.remainingSeconds))
+            }
+        }
+        .font(font)
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(style.minimumScaleFactor)
+        .frame(width: style.width, alignment: .trailing)
+    }
+    
+    private var font: Font {
+        switch style {
+        case .lockScreen:
+            return .system(size: 52, weight: .light, design: .rounded).monospacedDigit()
+        case .dynamicIslandCompact:
+            return .caption2.monospacedDigit().weight(.semibold)
+        case .dynamicIslandCompactExpanded:
+            return .title3.monospacedDigit().weight(.semibold)
+        case .dynamicIslandExpanded:
+            return .title2.monospacedDigit().weight(.semibold)
+        }
     }
 }
 
@@ -243,6 +306,12 @@ private func detailedLiveActivityTimeText(from seconds: Double) -> String {
     let minutes = totalSeconds / 60
     let seconds = totalSeconds % 60
     return String(format: "%d:%02d", minutes, seconds)
+}
+
+private func maskedLiveActivityTimeText(from seconds: Double) -> String {
+    let totalSeconds = max(0, Int(ceil(seconds)))
+    let minutes = totalSeconds / 60
+    return String(format: "%d:--", minutes)
 }
 
 private func themeColor(_ name: String) -> Color {
