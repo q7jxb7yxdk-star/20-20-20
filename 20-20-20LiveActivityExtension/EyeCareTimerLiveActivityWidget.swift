@@ -5,87 +5,86 @@ import WidgetKit
 
 // MARK: - Lock Screen Live Activity Widget
 
-// 這個型別要和 App target 裡的 EyeCareTimerLiveActivityAttributes 保持一致。
-// App target 會把 ContentState 傳給 ActivityKit；Widget Extension 會收到同一份 state 來畫 UI。
+// This type must stay in sync with EyeCareTimerLiveActivityAttributes in the App target.
+// The App target sends ContentState through ActivityKit, and the Widget Extension renders that state.
 nonisolated struct EyeCareTimerLiveActivityAttributes: ActivityAttributes {
-    // ContentState 是會被 App 不斷更新的資料。
-    // 倒數進行中時，Widget 會用 endDate 交給系統 timer renderer 顯示持續倒數。
-    // remainingSeconds 主要用於暫停狀態和按鈕 intent 計算。
+    // ContentState contains the values that the App updates during timer state changes.
+    // While running, the widget uses endDate with the system timer renderer for live countdown text.
+    // remainingSeconds is mainly used for paused text and AppIntent button calculations.
     public struct ContentState: Codable, Hashable {
-        // 目前階段名稱，例如「專注工作」。
+        // Current step name, such as "Focus Work".
         var stepName: String
-        // 目前階段 index，AppIntent 會用它計算下一階段。
+        // Current step index. AppIntent uses this to calculate the next step.
         var stepIndex: Int
-        // 簡單字串形式的主題色，例如 blue / green / orange。
+        // Theme color as a simple string, such as blue / green / orange.
         var themeName: String
-        // 開始與結束時間用於系統 timer renderer，讓 App 進入背景後仍能繼續顯示倒數。
+        // Start and end dates for the system timer renderer.
+        // This lets the countdown continue after the App enters the background.
         var startDate: Date
         var endDate: Date
-        // 暫停狀態會用這個值格式化成 m:ss。
+        // Paused state formats this value as m:ss.
         var remainingSeconds: Double
-        // 是否正在倒數。
+        // Whether the countdown is currently running.
         var isRunning: Bool
-        // 是否已經倒數完成並進入響鈴狀態。
+        // Whether the countdown has finished and entered the alarm state.
         var isAlarming: Bool
-        // true 代表目前 Live Activity 用 Debug 測試時間。
+        // true means this Live Activity was created with debug test durations.
         var isDebugMode: Bool
-        // AppIntent 按鈕會把控制命令寫入這裡，主 App 再讀取並真正控制 TimerManager。
+        // AppIntent buttons write control commands here; the main App reads them and updates TimerManager.
         var controlCommand: String?
-        // 每次按鈕產生新的 UUID，避免同一個命令被主 App 重複處理。
+        // Each button press creates a new UUID so the main App does not process the same command twice.
         var controlCommandID: UUID?
     }
     
-    // 建立 Activity 時固定的標題。
+    // Static title used when the Activity is created.
     var title: String
 }
 
 struct EyeCareTimerLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
-        // ActivityConfiguration 會同時定義：
-        // 1. Lock Screen / Notification Center 的 Live Activity UI。
-        // 2. Dynamic Island 的 compact / expanded / minimal UI。
+        // ActivityConfiguration defines both:
+        // 1. Lock Screen / Notification Center Live Activity UI.
+        // 2. Dynamic Island compact / expanded / minimal UI.
         ActivityConfiguration(for: EyeCareTimerLiveActivityAttributes.self) { context in
-            // context.state 就是 App target 透過 ActivityKit 傳過來的 ContentState。
+            // context.state is the ContentState sent by the App target through ActivityKit.
             LiveActivityLockScreenView(state: context.state)
-                // Lock Screen 卡片背景色。這裡用半透明黑色接近 iOS Clock timer 的感覺。
+                // Lock Screen card background tint.
                 .activityBackgroundTint(.black.opacity(0.62))
-                // 系統 action 前景色，例如某些系統按鈕或強調色。
+                // System action foreground color for system-provided highlights.
                 .activitySystemActionForegroundColor(.orange)
-                // 點擊 Live Activity 空白區域時打開 App。
-                // 兩個圓形按鈕改用 AppIntent，所以按下按鈕時可以直接控制，不需要打開 App。
+                // Tapping empty Live Activity space opens the App.
+                // The circular buttons use AppIntent, so they can control the timer without opening the App.
                 .widgetURL(openURL)
         } dynamicIsland: { context in
             DynamicIsland {
-                // 展開 Dynamic Island 後，左側放一個狀態 icon。
                 DynamicIslandExpandedRegion(.leading) {
                     // expanded icon
                     Image(systemName: dynamicIslandIconName(for: context.state))
                         .foregroundStyle(themeColor(context.state.themeName))
                 }
                 
-                // 展開 Dynamic Island 後，中間顯示完整倒數和 App 名稱。
                 DynamicIslandExpandedRegion(.center) {
                     LiveActivityExpandedView(state: context.state)
                 }
             } compactLeading: {
-                // compact 狀態左邊只放 icon，避免 Dynamic Island 過長。
                 // compact icon
+                // compact icon font size
                 Image(systemName: dynamicIslandIconName(for: context.state))
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(themeColor(context.state.themeName))
             } compactTrailing: {
-                // compact 狀態右邊顯示完整 m:ss。
-                // 字體和寬度要控制，否則可能遮住狀態列時間、訊號和電量。
+                // compact time
+                // Adjust compact time width and compact time font size in LiveActivityTimerText.Style.
                 detailedTimerText(for: context.state, style: .dynamicIslandCompact)
                     .foregroundStyle(themeColor(context.state.themeName))
             } minimal: {
-                // minimal 狀態空間極少，只顯示 icon。
                 // minimal icon
+                // minimal icon font size
                 Image(systemName: dynamicIslandIconName(for: context.state))
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(themeColor(context.state.themeName))
             }
-            // 點擊 Dynamic Island 其他位置時打開 App。
+            // Tapping the rest of the Dynamic Island opens the App.
             .widgetURL(openURL)
         }
     }
@@ -117,8 +116,8 @@ private struct LiveActivityLockScreenView: View {
             
             Spacer(minLength: 6)
             
-            // ViewThatFits 會先嘗試橫向排版；如果 Lock Screen 寬度不足，
-            // 就自動改成上下排，避免「20-20-20」或倒數時間被截走。
+            // ViewThatFits tries the horizontal layout first.
+            // If Lock Screen width is tight, it falls back to a vertical layout to avoid clipped text.
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     liveActivityTitle
@@ -134,7 +133,7 @@ private struct LiveActivityLockScreenView: View {
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 18)
-        // material 背景令卡片有 Liquid Glass 類似的半透明質感。
+        // Material background gives the card a translucent system-style surface.
         .background(.ultraThinMaterial.opacity(0.42), in: RoundedRectangle(cornerRadius: 34, style: .continuous))
     }
     
@@ -152,9 +151,9 @@ private struct LiveActivityLockScreenView: View {
     }
     
     private var startPauseSystemName: String {
-        // Live Activity 左邊主按鈕：
-        // - 倒數中：顯示 pause，按下會暫停。
-        // - 已暫停或時間到：顯示 play，按下會開始 / 進入下一階段。
+        // Main Lock Screen button:
+        // - Running: show pause and pause the timer.
+        // - Paused or alarming: show play and start / advance the timer.
         state.isRunning ? "pause.fill" : "play.fill"
     }
 }
@@ -183,7 +182,7 @@ private struct LiveActivityExpandedView: View {
     
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
-            // 展開 Dynamic Island 時空間比較多，可以用較大的完整秒數倒數。
+            // Dynamic Island expanded time
             detailedTimerText(for: state, style: .dynamicIslandExpanded)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             
@@ -209,11 +208,13 @@ private func dynamicIslandIconName(for state: EyeCareTimerLiveActivityAttributes
 }
 
 private func liveActivityIconLink<Intent: AppIntent>(systemName: String, intent: Intent, foreground: Color, background: Color) -> some View {
-    // Button(intent:) 會直接執行 AppIntent，不會像 Link 一樣打開 App。
-    // 這是 iOS 互動式 Widget / Live Activity 的原生做法。
+    // Button(intent:) runs the AppIntent directly instead of opening the App like Link.
+    // This is the native iOS pattern for interactive widgets and Live Activities.
     Button(intent: intent) {
         Image(systemName: systemName)
+            // Lock Screen button icon size
             .font(.system(size: 28, weight: .semibold))
+            // Lock Screen button icon frame width / height
             .frame(width: 56, height: 56)
             .foregroundStyle(foreground)
             .background(background, in: Circle())
@@ -238,13 +239,16 @@ private struct LiveActivityTimerText: View {
         var width: CGFloat {
             switch self {
             case .lockScreen:
+                // Lock Screen time width
                 return 140
             case .dynamicIslandCompact:
-                // Time font width
+                // Dynamic Island compact time width
                 return 42
             case .dynamicIslandCompactExpanded:
+                // Dynamic Island compact-expanded time width
                 return 72
             case .dynamicIslandExpanded:
+                // Dynamic Island expanded time width
                 return 86
             }
         }
@@ -261,6 +265,7 @@ private struct LiveActivityTimerText: View {
         var height: CGFloat? {
             switch self {
             case .lockScreen:
+                // Lock Screen time height
                 return 62
             default:
                 return nil
@@ -274,13 +279,13 @@ private struct LiveActivityTimerText: View {
     var body: some View {
         ZStack(alignment: .trailing) {
             if state.isAlarming {
-                // 已經響鈴時固定顯示 0:00，避免倒數完成後繼續顯示負數或舊時間。
+                // Alarming state uses fixed 0:00 to avoid negative or stale countdown text.
                 Text("0:00")
             } else if state.isRunning {
-                // Running 狀態直接用系統 timer renderer，讓 active / inactive Lock Screen 都由系統持續倒數。
+                // Running state uses the system timer renderer for active / inactive Lock Screen countdown.
                 Text(timerInterval: state.startDate...state.endDate, countsDown: true)
             } else {
-                // 暫停時顯示固定剩餘時間，避免 pause 後畫面繼續跳秒。
+                // Paused state uses fixed remaining time so the display stops ticking.
                 Text(detailedLiveActivityTimeText(from: state.remainingSeconds))
             }
         }
@@ -294,21 +299,24 @@ private struct LiveActivityTimerText: View {
     private var font: Font {
         switch style {
         case .lockScreen:
+            // Lock Screen time font size
             return .system(size: 52, weight: .light, design: .rounded).monospacedDigit()
         case .dynamicIslandCompact:
-            // Time font size
+            // Dynamic Island compact time font size
             return .system(size: 20, weight: .semibold, design: .rounded).monospacedDigit()
         case .dynamicIslandCompactExpanded:
+            // Dynamic Island compact-expanded time font size
             return .title3.monospacedDigit().weight(.semibold)
         case .dynamicIslandExpanded:
+            // Dynamic Island expanded time font size
             return .title2.monospacedDigit().weight(.semibold)
         }
     }
 }
 
 private func detailedLiveActivityTimeText(from seconds: Double) -> String {
-    // ceil 代表 59.2 秒會顯示 1:00 / 60 秒，視覺上比較接近倒數器。
-    // max(0, ...) 避免時間過了之後出現負數。
+    // ceil makes 59.2 seconds display as 1:00 / 60 seconds, which feels closer to a countdown timer.
+    // max(0, ...) prevents negative time after the target date has passed.
     let totalSeconds = max(0, Int(ceil(seconds)))
     let minutes = totalSeconds / 60
     let seconds = totalSeconds % 60
@@ -316,7 +324,7 @@ private func detailedLiveActivityTimeText(from seconds: Double) -> String {
 }
 
 private func themeColor(_ name: String) -> Color {
-    // App target 傳過來的是簡單字串；Widget target 在這裡轉成 SwiftUI Color。
+    // The App target sends a simple string; the Widget target converts it back to a SwiftUI Color here.
     switch name {
     case "green":
         return .green

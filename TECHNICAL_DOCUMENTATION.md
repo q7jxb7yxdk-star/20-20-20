@@ -291,6 +291,26 @@ The time UI is centralized in `LiveActivityTimerText`. It owns:
 
 Keeping these states inside one component keeps Lock Screen and Dynamic Island timer layout consistent.
 
+Time size and width are intentionally marked in `EyeCareTimerLiveActivityWidget.swift` so they are easy to tune later:
+
+- `Lock Screen time width`: `LiveActivityTimerText.Style.width`, `.lockScreen`.
+- `Lock Screen time height`: `LiveActivityTimerText.Style.height`, `.lockScreen`.
+- `Lock Screen time font size`: `LiveActivityTimerText.font`, `.lockScreen`.
+- `Dynamic Island compact time width`: `LiveActivityTimerText.Style.width`, `.dynamicIslandCompact`.
+- `Dynamic Island compact time font size`: `LiveActivityTimerText.font`, `.dynamicIslandCompact`.
+- `Dynamic Island compact-expanded time width`: `LiveActivityTimerText.Style.width`, `.dynamicIslandCompactExpanded`.
+- `Dynamic Island compact-expanded time font size`: `LiveActivityTimerText.font`, `.dynamicIslandCompactExpanded`.
+- `Dynamic Island expanded time width`: `LiveActivityTimerText.Style.width`, `.dynamicIslandExpanded`.
+- `Dynamic Island expanded time font size`: `LiveActivityTimerText.font`, `.dynamicIslandExpanded`.
+
+Icon size is controlled outside `LiveActivityTimerText`:
+
+- `compact icon font size`: the `Image` in `compactLeading`.
+- `minimal icon font size`: the `Image` in `minimal`.
+- `expanded icon`: the `Image` in `DynamicIslandExpandedRegion(.leading)`.
+- `Lock Screen button icon size`: the `Image` inside `liveActivityIconLink`.
+- `Lock Screen button icon frame width / height`: the `.frame(width:height:)` inside `liveActivityIconLink`.
+
 Dynamic Island keeps using `Text(timerInterval:)` for running time so the compact countdown remains system-rendered. Lock Screen also uses the system timer renderer for running time, while paused and alarming states use fixed text.
 
 Dynamic Island icon state is centralized through `dynamicIslandIconName(for:)`:
