@@ -146,3 +146,4 @@ Use `git add -A` only when you have checked `git status` and really want to incl
 - Live Activity behavior should be verified on a real iPhone because Simulator Lock Screen / SpringBoard behavior can differ from real devices.
 - Live Activity uses the system timer renderer for running countdowns so active and inactive Lock Screen states stay in sync.
 - Running Live Activity state is not pushed every second; the widget receives an end date and lets the system render the countdown.
+- Dynamic Island compact layout uses separate icon and time sizing values; its width is controlled indirectly by the rendered content, not by a direct Dynamic Island width setting.

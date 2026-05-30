@@ -293,6 +293,19 @@ Keeping these states inside one component keeps Lock Screen and Dynamic Island t
 
 Dynamic Island keeps using `Text(timerInterval:)` for running time so the compact countdown remains system-rendered. Lock Screen also uses the system timer renderer for running time, while paused and alarming states use fixed text.
 
+Dynamic Island icon state is centralized through `dynamicIslandIconName(for:)`:
+
+- Running: `timer`
+- Paused: `pause.circle`
+- Alarming: `bell.fill`
+
+Dynamic Island compact width is not directly configurable. The system sizes the island from the compact leading and compact trailing content. The App can only influence it indirectly through:
+
+- Compact icon font size.
+- Compact time font size.
+- Compact time frame width.
+- Visual offsets such as `offset(x:)`, which move drawing but do not change the layout size.
+
 The App only updates the Live Activity at state transitions such as start, pause, resume, reset, next step, and time up. It does not update the Activity every display tick.
 
 ## 16. Live Activity Buttons

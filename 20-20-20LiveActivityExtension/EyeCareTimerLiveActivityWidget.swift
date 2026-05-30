@@ -58,7 +58,8 @@ struct EyeCareTimerLiveActivityWidget: Widget {
             DynamicIsland {
                 // 展開 Dynamic Island 後，左側放一個狀態 icon。
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(systemName: context.state.isAlarming ? "bell.fill" : "timer")
+                    // expanded icon
+                    Image(systemName: dynamicIslandIconName(for: context.state))
                         .foregroundStyle(themeColor(context.state.themeName))
                 }
                 
@@ -68,8 +69,9 @@ struct EyeCareTimerLiveActivityWidget: Widget {
                 }
             } compactLeading: {
                 // compact 狀態左邊只放 icon，避免 Dynamic Island 過長。
-                Image(systemName: context.state.isAlarming ? "bell.fill" : "timer")
-                    .font(.caption.weight(.semibold))
+                // compact icon
+                Image(systemName: dynamicIslandIconName(for: context.state))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(themeColor(context.state.themeName))
             } compactTrailing: {
                 // compact 狀態右邊顯示完整 m:ss。
@@ -78,7 +80,8 @@ struct EyeCareTimerLiveActivityWidget: Widget {
                     .foregroundStyle(themeColor(context.state.themeName))
             } minimal: {
                 // minimal 狀態空間極少，只顯示 icon。
-                Image(systemName: context.state.isAlarming ? "bell.fill" : "timer")
+                // minimal icon
+                Image(systemName: dynamicIslandIconName(for: context.state))
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(themeColor(context.state.themeName))
             }
@@ -100,6 +103,7 @@ private struct LiveActivityLockScreenView: View {
                     systemName: startPauseSystemName,
                     intent: ToggleEyeCareLiveActivityIntent(),
                     foreground: .orange,
+                    // pause circle
                     background: .orange.opacity(0.34)
                 )
 
@@ -198,6 +202,12 @@ private var openURL: URL {
     URL(string: "eyecaretimer://live-activity/open")!
 }
 
+private func dynamicIslandIconName(for state: EyeCareTimerLiveActivityAttributes.ContentState) -> String {
+    if state.isAlarming { return "bell.fill" }
+    if state.isRunning { return "timer" }
+    return "pause.circle"
+}
+
 private func liveActivityIconLink<Intent: AppIntent>(systemName: String, intent: Intent, foreground: Color, background: Color) -> some View {
     // Button(intent:) 會直接執行 AppIntent，不會像 Link 一樣打開 App。
     // 這是 iOS 互動式 Widget / Live Activity 的原生做法。
@@ -230,7 +240,8 @@ private struct LiveActivityTimerText: View {
             case .lockScreen:
                 return 140
             case .dynamicIslandCompact:
-                return 52
+                // Time font width
+                return 42
             case .dynamicIslandCompactExpanded:
                 return 72
             case .dynamicIslandExpanded:
@@ -285,7 +296,8 @@ private struct LiveActivityTimerText: View {
         case .lockScreen:
             return .system(size: 52, weight: .light, design: .rounded).monospacedDigit()
         case .dynamicIslandCompact:
-            return .caption2.monospacedDigit().weight(.semibold)
+            // Time font size
+            return .system(size: 20, weight: .semibold, design: .rounded).monospacedDigit()
         case .dynamicIslandCompactExpanded:
             return .title3.monospacedDigit().weight(.semibold)
         case .dynamicIslandExpanded:
