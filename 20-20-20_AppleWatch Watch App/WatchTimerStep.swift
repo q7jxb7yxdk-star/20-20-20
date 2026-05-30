@@ -62,8 +62,8 @@ enum WatchAppConfiguration {
     }
     
     enum DefaultsKey {
-        static let runMode = "app_run_mode"
-        static let languageCode = "app_language_code"
+        nonisolated static let runMode = "app_run_mode"
+        nonisolated static let languageCode = "app_language_code"
     }
     
     typealias DurationConfiguration = (work: Int, eyeCare: Int, longRest: Int)
