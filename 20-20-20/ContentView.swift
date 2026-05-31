@@ -220,12 +220,12 @@ extension ContentView {
             
             Text(statusTitle)
                 .font(.title2.bold())
-                .foregroundColor(manager.isAlarming ? .red : .primary)
+                .foregroundColor(manager.displayIsAlarming ? .red : .primary)
                 .lineLimit(2)
                 .minimumScaleFactor(0.75)
                 .multilineTextAlignment(.center)
                 // value 指定動畫只在 isAlarming 改變時觸發，避免所有狀態更新都套動畫。
-                .animation(.easeInOut, value: manager.isAlarming)
+                .animation(.easeInOut, value: manager.displayIsAlarming)
         }
         .frame(maxWidth: .infinity)
     }
@@ -245,20 +245,20 @@ extension ContentView {
                 // trim 只畫出圓的一部分；剩餘秒數越少，彩色弧線越短。
                 .trim(from: 0, to: progress)
                 .stroke(
-                    manager.isAlarming ? Color.red : manager.currentStep.themeColor,
+                    manager.displayIsAlarming ? Color.red : manager.displayStep.themeColor,
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90)) // 起點修正到正上方
-                .animation(.linear(duration: 0.2), value: manager.timeRemaining)
+                .animation(.linear(duration: 0.2), value: manager.displayTimeRemaining)
             
             VStack(spacing: 10) {
                 // 圖示
-                Image(systemName: manager.currentStep.icon)
+                Image(systemName: manager.displayStep.icon)
                     .font(.system(size: max(24, size * 0.14), weight: .regular))
-                    .foregroundColor(manager.isAlarming ? .red : manager.currentStep.themeColor)
+                    .foregroundColor(manager.displayIsAlarming ? .red : manager.displayStep.themeColor)
                 
                 // 時間文字（例如 19:59）
-                Text(timeString(from: Int(ceil(manager.timeRemaining))))
+                Text(timeString(from: Int(ceil(manager.displayTimeRemaining))))
                     .font(.system(size: timeFontSize, weight: .bold, design: .monospaced))
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
@@ -285,8 +285,8 @@ extension ContentView {
                 }
             }
             .buttonStyle(PlainButtonStyle())
-            .scaleEffect(manager.isAlarming ? 1.15 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: manager.isAlarming)
+            .scaleEffect(manager.displayIsAlarming ? 1.15 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: manager.displayIsAlarming)
             
             // 重置按鈕
             Button(action: manager.reset) {
@@ -308,7 +308,7 @@ extension ContentView {
     private func performPrimaryTimerAction() {
         // 同一顆主按鈕在不同狀態下做不同事：
         // 響鈴時是「確認並進下一階段」，平常是「開始/暫停」。
-        if manager.isAlarming {
+        if manager.displayIsAlarming {
             manager.nextStep() // 響鈴時點一下進入下一關
         } else {
             manager.toggle()   // 平常點一下切換暫停/開始
@@ -337,39 +337,39 @@ extension ContentView {
     
     private func stepDot(for step: TimerStep) -> some View {
         Circle()
-            .fill(manager.currentStep == step ? manager.currentStep.themeColor : Color.gray.opacity(0.2))
+            .fill(manager.displayStep == step ? manager.displayStep.themeColor : Color.gray.opacity(0.2))
             .frame(width: 8, height: 8)
             .contentShape(Circle())
-            .animation(.spring(), value: manager.currentStep)
+            .animation(.spring(), value: manager.displayStep)
     }
     
     // 控制按鈕圖示變換
     private var mainButtonIcon: String {
         // 用狀態推導 UI，而不是在按鈕裡手動記錄圖示。
         // 這是 SwiftUI 常見做法：資料狀態改變，畫面自然跟著改變。
-        if manager.isAlarming { return "checkmark" }
-        return manager.isRunning ? "pause.fill" : "play.fill"
+        if manager.displayIsAlarming { return "checkmark" }
+        return manager.displayIsRunning ? "pause.fill" : "play.fill"
     }
     
     // 控制按鈕顏色變換
     private var mainButtonColor: Color {
         // 將顏色邏輯集中在這裡，Button 的 View 宣告就能保持乾淨。
-        if manager.isAlarming { return .orange }
-        return manager.isRunning ? .red : .blue
+        if manager.displayIsAlarming { return .orange }
+        return manager.displayIsRunning ? .red : .blue
     }
     
     private var progress: Double {
-        let totalSeconds = manager.currentStep.seconds
+        let totalSeconds = manager.displayStep.seconds
         guard totalSeconds > 0 else { return 0 }
-        return max(0, min(1, manager.timeRemaining / Double(totalSeconds)))
+        return max(0, min(1, manager.displayTimeRemaining / Double(totalSeconds)))
     }
     
     // 標題文字會隨狀態改變：
     // 平常顯示目前階段名稱；倒數完成並響鈴時，改成更明確的「第幾階段完成」提示。
     private var statusTitle: String {
-        guard manager.isAlarming else { return manager.currentStep.name }
+        guard manager.displayIsAlarming else { return manager.displayStep.name }
         
-        switch manager.currentStep {
+        switch manager.displayStep {
         case .work1:
             return AppText.completedTitle(.work1)
         case .eyeCare:

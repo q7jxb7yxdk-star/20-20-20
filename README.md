@@ -73,9 +73,10 @@ On macOS, settings are available from the App Settings window.
 
 macOS controls:
 
-- Click a step dot to jump directly to that cycle step.
-- Press `Left Arrow` / `Right Arrow` to move to the previous / next cycle step.
-- Press `Space` to start, pause, or confirm the completed step.
+- Click a step dot to select and display that cycle step.
+- Press `Left Arrow` / `Right Arrow` to move the selected cycle step backward / forward.
+- If another step is already counting down, it keeps running in the background while the selected step changes.
+- Press `Space` to start, pause, or confirm the completed step. Starting a different selected step replaces the currently running step.
 - Press `R` to reset.
 
 The App UI language is stored with:

@@ -166,6 +166,14 @@ It is marked `@MainActor` because its `@Published` properties directly update Sw
 @Published var isAlarming: Bool
 ```
 
+On macOS, `TimerManager` also keeps a separate selected step:
+
+```swift
+@Published var selectedStep: TimerStep
+```
+
+`currentStep` remains the step that is actually running or alarming. `selectedStep` is the step currently selected and displayed by the macOS UI. This allows the user to inspect another cycle step while an existing step continues counting down in the background.
+
 Main responsibilities:
 
 - Start countdown.
@@ -226,13 +234,22 @@ The macOS UI supports direct cycle navigation before the same behavior is expand
 - `selectPreviousStep()`
 - `selectNextStep()`
 
-Selecting a step stops the current countdown, clears alarming state, cancels macOS notifications, resets the selected step to its full duration, and leaves the timer paused. It does not automatically start the selected step.
+macOS separates the displayed step from the running step:
+
+- `currentStep`: the step that is currently counting down or alarming.
+- `selectedStep`: the step currently highlighted by the dots and shown in the main UI.
+
+Selecting a step updates `selectedStep` and the displayed timer state. It does not automatically stop or replace the current countdown. If Step 1 is counting down and the user selects Step 2, Step 1 continues running in the background while the main UI shows Step 2.
+
+Each step stores its own remaining time on macOS. When the user returns to a running or paused step, the UI shows that step's current saved remaining time.
+
+If the user presses Start while the selected step is different from the running step, the App starts the selected step and replaces the previous running step. If the selected step is the same as the running step, the primary action behaves as the normal start / pause toggle.
 
 `ContentView` wires these controls on macOS:
 
 - Step dots: click a dot to select that `TimerStep`.
-- `Left Arrow`: select the previous step, wrapping from Step 1 to Step 4.
-- `Right Arrow`: select the next step, wrapping from Step 4 to Step 1.
+- `Left Arrow`: select the previous step from `selectedStep`, wrapping from Step 1 to Step 4.
+- `Right Arrow`: select the next step from `selectedStep`, wrapping from Step 4 to Step 1.
 - `Space`: run the same primary action as the main button, so it starts, pauses, or confirms an alarming step.
 - `R`: reset the timer.
 
