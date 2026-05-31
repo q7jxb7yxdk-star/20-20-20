@@ -11,6 +11,7 @@ import SwiftUI
 
 @main
 struct _0_20_20_AppleWatch_Watch_AppApp: App {
+    @WKApplicationDelegateAdaptor(WatchApplicationDelegate.self) private var applicationDelegate
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var manager = WatchTimerManager.shared
     
@@ -25,10 +26,19 @@ struct _0_20_20_AppleWatch_Watch_AppApp: App {
         WindowGroup {
             WatchContentView(manager: manager)
                 .onChange(of: scenePhase) { _, newPhase in
-                    guard newPhase == .active else { return }
+                    let isActive = newPhase == .active
+                    manager.updateAppActiveState(isActive)
+                    
+                    guard isActive else { return }
                     manager.stopAlarmAlertAfterOpeningApp()
                 }
         }
+    }
+}
+
+final class WatchApplicationDelegate: NSObject, WKApplicationDelegate {
+    func handle(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
+        WatchTimerManager.shared.recoverSmartAlarmSession(extendedRuntimeSession)
     }
 }
 
