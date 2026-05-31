@@ -43,6 +43,9 @@ struct ContentView: View {
             onReset: manager.reset
         ))
         #endif
+        #if os(iOS)
+        .gesture(cycleSwipeGesture)
+        #endif
         .onAppear { manager.setupOnLaunch() } // 畫面加載完成後進行權限請求
         #if os(iOS)
         .onOpenURL { url in
@@ -342,6 +345,23 @@ extension ContentView {
             .contentShape(Circle())
             .animation(.spring(), value: manager.displayStep)
     }
+    
+    #if os(iOS)
+    private var cycleSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 35)
+            .onEnded { value in
+                let width = value.translation.width
+                let height = value.translation.height
+                guard abs(width) > abs(height) * 1.4, abs(width) > 45 else { return }
+                
+                if width < 0 {
+                    manager.selectNextStep()
+                } else {
+                    manager.selectPreviousStep()
+                }
+            }
+    }
+    #endif
     
     // 控制按鈕圖示變換
     private var mainButtonIcon: String {

@@ -19,7 +19,7 @@ class TimerManager: NSObject, ObservableObject {
     @Published var timeRemaining: Double = Double(TimerStep.work1.seconds) // 剩餘秒數
     @Published var isRunning = false                    // 是否正在跑
     @Published var isAlarming = false                   // 是否正在響鈴
-    #if os(macOS)
+    #if os(iOS) || os(macOS)
     @Published var selectedStep: TimerStep = .work1
     #endif
     
@@ -33,13 +33,16 @@ class TimerManager: NSObject, ObservableObject {
     // 記住上一次使用的模式，避免 App 回到前景時因為 UserDefaults 通知而誤把暫停中的倒數重設。
     private var lastRunMode = AppConfiguration.runMode
     
+    #if os(iOS) || os(macOS)
+    private var stepRemainingSeconds = TimerStep.allCases.map { Double($0.seconds) }
+    // When a cycle step is selected while paused, keep the current remaining time visible.
+    // The selected step is reset to its full duration only when the user starts it.
+    private var shouldResetSelectedStepOnStart = false
+    #endif
+    
     #if os(macOS)
     // macOS 沒有使用 AlarmKit，所以仍由 App 內的 NSSound 播放提醒聲。
     private var alarmSound: NSSound?
-    private var stepRemainingSeconds = TimerStep.allCases.map { Double($0.seconds) }
-    // When a macOS cycle step is selected while paused, keep the current remaining time visible.
-    // The selected step is reset to its full duration only when the user starts it.
-    private var shouldResetSelectedStepOnStart = false
     #endif
     private let soundFileName = "alarm"                 // 預備播放的檔案名稱
     private let scheduledNotificationIdentifier = "202020Notification.scheduled"
@@ -77,7 +80,7 @@ class TimerManager: NSObject, ObservableObject {
     }
     
     var displayStep: TimerStep {
-        #if os(macOS)
+        #if os(iOS) || os(macOS)
         return selectedStep
         #else
         return currentStep
@@ -89,7 +92,7 @@ class TimerManager: NSObject, ObservableObject {
     }
     
     var displayIsRunning: Bool {
-        #if os(macOS)
+        #if os(iOS) || os(macOS)
         return isRunning && selectedStep == currentStep
         #else
         return isRunning
@@ -97,7 +100,7 @@ class TimerManager: NSObject, ObservableObject {
     }
     
     var displayIsAlarming: Bool {
-        #if os(macOS)
+        #if os(iOS) || os(macOS)
         return isAlarming && selectedStep == currentStep
         #else
         return isAlarming
@@ -145,8 +148,8 @@ class TimerManager: NSObject, ObservableObject {
         handleLiveActivityControlCommandIfNeeded()
         #endif
         
-        #if os(macOS)
-        syncMacOSRemainingTime()
+        #if os(iOS) || os(macOS)
+        syncSelectedStepRemainingTime()
         #else
         // guard 提早退出：只有正在倒數且有目標時間時，才需要更新畫面。
         guard isRunning, let target = targetDate else { return }
@@ -161,8 +164,8 @@ class TimerManager: NSObject, ObservableObject {
         #endif
     }
     
-    #if os(macOS)
-    private func syncMacOSRemainingTime() {
+    #if os(iOS) || os(macOS)
+    private func syncSelectedStepRemainingTime() {
         guard isRunning, let target = targetDate else { return }
         let diff = target.timeIntervalSinceNow
         
@@ -229,6 +232,10 @@ class TimerManager: NSObject, ObservableObject {
         // 如果倒數正在跑，臨時改時間會令 targetDate 變得不清楚，所以不改動當前倒數。
         // 當計時器停低時，就即時用新模式的秒數更新畫面，方便測試 Debug / Release 切換。
         guard !isRunning, !isAlarming else { return }
+        #if os(iOS) || os(macOS)
+        stepRemainingSeconds = TimerStep.allCases.map { Double($0.seconds) }
+        selectedStep = currentStep
+        #endif
         timeRemaining = Double(currentStep.seconds)
     }
     
@@ -256,6 +263,9 @@ class TimerManager: NSObject, ObservableObject {
         refreshConfigurationAfterReturningFromSettings()
         if isAlarming || (isRunning && (targetDate?.timeIntervalSinceNow ?? 1) <= 0) {
             stopAlarmKitTimer()
+            setRemainingSeconds(0, for: currentStep)
+            selectedStep = currentStep
+            shouldResetSelectedStepOnStart = false
             isRunning = false
             isAlarming = true
             timeRemaining = 0
@@ -275,7 +285,7 @@ class TimerManager: NSObject, ObservableObject {
     
     // 開始/暫停按鈕的切換
     func toggle() {
-        #if os(macOS)
+        #if os(iOS) || os(macOS)
         if isRunning && selectedStep == currentStep {
             pause()
         } else {
@@ -294,14 +304,25 @@ class TimerManager: NSObject, ObservableObject {
         if isAlarming {
             nextStep()
         } else {
+            #if os(iOS)
+            if isRunning {
+                pause()
+            } else {
+                selectedStep = currentStep
+                shouldResetSelectedStepOnStart = false
+                timeRemaining = remainingSeconds(for: currentStep)
+                start()
+            }
+            #else
             toggle()
+            #endif
         }
     }
 
     // 開始計時：紀錄未來的結束時間點並預約系統通知
     func start() {
-        #if os(macOS)
-        startMacOSTimer()
+        #if os(iOS) || os(macOS)
+        startSelectedStepTimer()
         #else
         // 用目前剩餘秒數加上現在時間，得到這輪倒數真正應該結束的時刻。
         targetDate = Date().addingTimeInterval(timeRemaining)
@@ -316,10 +337,14 @@ class TimerManager: NSObject, ObservableObject {
         #endif
     }
     
-    #if os(macOS)
-    private func startMacOSTimer() {
-        if isRunning, let target = targetDate {
-            setRemainingSeconds(target.timeIntervalSinceNow, for: currentStep)
+    #if os(iOS) || os(macOS)
+    private func startSelectedStepTimer() {
+        if isRunning {
+            if currentStep == selectedStep, let target = targetDate {
+                setRemainingSeconds(target.timeIntervalSinceNow, for: currentStep)
+            } else {
+                setRemainingSeconds(Double(currentStep.seconds), for: currentStep)
+            }
         }
         
         currentStep = selectedStep
@@ -335,13 +360,20 @@ class TimerManager: NSObject, ObservableObject {
         targetDate = Date().addingTimeInterval(timeRemaining)
         isRunning = true
         isAlarming = false
+        #if os(iOS)
+        let token = UUID()
+        alarmSchedulingToken = token
+        startOrUpdateLiveActivity()
+        Task { await scheduleAlarmKitTimer(expectedToken: token) }
+        #elseif os(macOS)
         cancelNotifications()
+        #endif
     }
     #endif
 
     // 暫停計時
     func pause() {
-        #if os(macOS)
+        #if os(iOS) || os(macOS)
         if isRunning, let target = targetDate {
             setRemainingSeconds(target.timeIntervalSinceNow, for: currentStep)
             if selectedStep == currentStep {
@@ -366,7 +398,8 @@ class TimerManager: NSObject, ObservableObject {
         stopAlarmSound()
         #if os(iOS)
         EyeCareLiveActivityManager.shared.end()
-        #elseif os(macOS)
+        #endif
+        #if os(iOS) || os(macOS)
         shouldResetSelectedStepOnStart = false
         stepRemainingSeconds = TimerStep.allCases.map { Double($0.seconds) }
         selectedStep = .work1
@@ -380,7 +413,7 @@ class TimerManager: NSObject, ObservableObject {
     func triggerAlarm() {
         // 防止重複觸發：Timer 會定期跑一次，如果不擋住，可能會連續呼叫多次。
         guard !isAlarming else { return }
-        #if os(macOS)
+        #if os(iOS) || os(macOS)
         setRemainingSeconds(0, for: currentStep)
         selectedStep = currentStep
         shouldResetSelectedStepOnStart = false
@@ -416,12 +449,12 @@ class TimerManager: NSObject, ObservableObject {
         // rawValue + 1 代表往下一階段；% allSteps.count 讓最後一階段之後回到第一階段。
         let nextIndex = (currentStep.rawValue + 1) % allSteps.count
         currentStep = allSteps[nextIndex]
-        #if os(macOS)
+        #if os(iOS) || os(macOS)
         selectedStep = currentStep
         shouldResetSelectedStepOnStart = false
         #endif
         timeRemaining = Double(currentStep.seconds)
-        #if os(macOS)
+        #if os(iOS) || os(macOS)
         setRemainingSeconds(timeRemaining, for: currentStep)
         #endif
         
@@ -433,8 +466,8 @@ class TimerManager: NSObject, ObservableObject {
         triggerHaptic()
     }
     
-    #if os(macOS)
-    // Select a specific cycle step from the macOS step dots.
+    #if os(iOS) || os(macOS)
+    // Select a specific cycle step from macOS step dots or iOS swipe gestures.
     // This keeps the current remaining time visible and resets the selected step only when Start is pressed.
     func selectStep(_ step: TimerStep) {
         if isRunning, let target = targetDate {
@@ -488,13 +521,14 @@ class TimerManager: NSObject, ObservableObject {
     private func startOrUpdateLiveActivity(isRunning liveActivityIsRunning: Bool? = nil) {
         // targetDate 是這次倒數真正的結束時間。
         // 如果 targetDate 暫時不存在，就用目前剩餘秒數推算一個 endDate，避免 Live Activity 沒有時間資料。
-        let endDate = targetDate ?? Date().addingTimeInterval(timeRemaining)
+        let activityRemainingSeconds = selectedStep == currentStep ? timeRemaining : remainingSeconds(for: currentStep)
+        let endDate = targetDate ?? Date().addingTimeInterval(activityRemainingSeconds)
         
         // 把 TimerManager 的狀態交給 ActivityKit manager。
         // Widget Extension 不會直接讀 TimerManager，只會收到這裡送出去的 ContentState。
         EyeCareLiveActivityManager.shared.startOrUpdate(
             step: currentStep,
-            remainingSeconds: timeRemaining,
+            remainingSeconds: activityRemainingSeconds,
             endDate: endDate,
             isRunning: liveActivityIsRunning ?? isRunning,
             isAlarming: isAlarming
