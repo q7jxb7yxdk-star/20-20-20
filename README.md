@@ -10,12 +10,14 @@ This repository is also used as a learning project, so the Swift files include m
 - Circular countdown progress UI.
 - Start, pause, reset, and confirm-next-step controls.
 - macOS step-dot and keyboard cycle controls.
+- iOS and watchOS cycle selection controls.
 - Debug and Release run modes.
 - English and Traditional Chinese UI language support.
 - iOS Lock Screen / Dynamic Island Live Activity with system-rendered countdown time.
 - iOS AlarmKit reminders.
 - macOS local notification and in-app alarm sound.
 - watchOS countdown app with system haptic / smart alarm behavior.
+- watchOS swipe cycle selection.
 - iPhone to Apple Watch sync for run mode and preferred language.
 
 ## Platforms
@@ -78,6 +80,12 @@ macOS controls:
 - If another step is already counting down, it keeps running in the background while the selected step changes.
 - Press `Space` to start, pause, or confirm the completed step. Starting a different selected step replaces the currently running step.
 - Press `R` to reset.
+
+iOS and watchOS controls:
+
+- Swipe left / right to select another cycle step.
+- If another step is already counting down, it keeps running while the selected step changes.
+- Starting a different selected step replaces the currently running step.
 
 The App UI language is stored with:
 
@@ -156,3 +164,5 @@ Use `git add -A` only when you have checked `git status` and really want to incl
 - Live Activity uses the system timer renderer for running countdowns so active and inactive Lock Screen states stay in sync.
 - Running Live Activity state is not pushed every second; the widget receives an end date and lets the system render the countdown.
 - Dynamic Island compact layout uses separate icon and time sizing values; its width is controlled indirectly by the rendered content, not by a direct Dynamic Island width setting.
+- watchOS background alerts use `WKExtendedRuntimeSession` and the system `notifyUser(...)` alert / haptic. The Watch app avoids playing an additional manual notification haptic on that background path so the alert does not sound doubled.
+- `Watch smart alarm session invalidated: WKExtendedRuntimeSessionInvalidationReason(rawValue: 0)` means the Watch smart alarm session ended normally, usually after the app cancelled it because the user paused, rescheduled, or opened the app while alarming.

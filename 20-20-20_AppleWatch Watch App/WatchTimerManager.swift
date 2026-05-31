@@ -217,7 +217,6 @@ final class WatchTimerManager: NSObject, ObservableObject {
         isAlarming = true
         timeRemaining = 0
         targetDate = nil
-        WKInterfaceDevice.current().play(.notification)
     }
     
     private func scheduleSmartAlarmSession(at date: Date) {

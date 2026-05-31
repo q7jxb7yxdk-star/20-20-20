@@ -255,7 +255,20 @@ If the user presses Start while the selected step is different from the running 
 
 Keyboard handling is implemented with a macOS-only `NSViewRepresentable` named `MacKeyboardCycleController`. It installs a local key-down monitor so the controls work while the App window is active without depending on SwiftUI button focus.
 
-## 13. Platform Alert Strategy
+## 13. iOS and watchOS Cycle Controls
+
+iOS and watchOS use swipe gestures for cycle selection because the step dots are small touch targets on compact screens.
+
+The selected-step behavior matches the macOS model:
+
+- `currentStep`: the step that is currently counting down or alarming.
+- `selectedStep`: the step currently shown in the main UI.
+
+Swiping left or right updates `selectedStep` and the displayed timer state. It does not automatically stop or replace the current countdown. For example, if Step 4 is counting down and the user swipes to Step 3, Step 4 keeps running until the user starts Step 3.
+
+If the user starts a selected step while another step is already running, the newest selected step becomes the active countdown and the older running step is reset.
+
+## 14. Platform Alert Strategy
 
 | Platform | Foreground | Background | Custom Sound |
 | --- | --- | --- | --- |
@@ -267,7 +280,7 @@ macOS does not have a public AlarmKit equivalent. It uses `UserNotifications` pl
 
 watchOS background audio is limited. The watchOS app uses system haptic / smart alarm behavior rather than trying to play a custom CAF file.
 
-## 14. iOS AlarmKit
+## 15. iOS AlarmKit
 
 `AlarmKitSupport.swift` contains:
 
@@ -278,7 +291,7 @@ AlarmKit handles system-level timer alert behavior on iOS. It is closer to the s
 
 The stop intent uses a static English metadata title because AppIntents metadata extraction requires literal strings. Runtime App UI text still uses `AppText`.
 
-## 15. Notifications
+## 16. Notifications
 
 `NotificationPresenter.swift` implements `UNUserNotificationCenterDelegate`.
 
@@ -292,7 +305,7 @@ UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
 
 `NotificationPresenter.shared` is a singleton so the notification center delegate is not accidentally released.
 
-## 16. Live Activity
+## 17. Live Activity
 
 iOS uses Live Activity to show countdown state on the Lock Screen and Dynamic Island.
 
@@ -367,7 +380,7 @@ Dynamic Island compact width is not directly configurable. The system sizes the 
 
 The App only updates the Live Activity at state transitions such as start, pause, resume, reset, next step, and time up. It does not update the Activity every display tick.
 
-## 17. Live Activity Buttons
+## 18. Live Activity Buttons
 
 The Live Activity has interactive buttons:
 
@@ -393,7 +406,7 @@ Because a Live Activity intent cannot directly access the active `TimerManager` 
 
 This avoids requiring App Groups for this feature.
 
-## 18. Apple Watch App
+## 19. Apple Watch App
 
 The watchOS code lives in:
 
@@ -419,7 +432,7 @@ The Watch app receives these values from iPhone:
 
 If the Watch timer is idle when new settings arrive, it refreshes the displayed duration immediately.
 
-## 19. Watch Smart Alarm
+## 20. Watch Smart Alarm
 
 The Watch app uses `WKExtendedRuntimeSession` for background smart alarm behavior.
 
@@ -446,7 +459,47 @@ If the session object is released too early, Xcode may show messages such as:
 WKExtendedRuntimeObject was dealloced while scheduled
 ```
 
-## 20. Settings
+The Watch app process uses:
+
+```swift
+@WKApplicationDelegateAdaptor(WatchApplicationDelegate.self)
+```
+
+`WatchApplicationDelegate` implements `handle(_ extendedRuntimeSession:)` and passes the recovered session back to `WatchTimerManager`. This is needed when watchOS starts or resumes the app at the scheduled alarm time. The manager immediately sets the recovered session delegate and retains the session.
+
+When the scheduled session starts, `extendedRuntimeSessionDidStart(_:)` calls:
+
+```swift
+session.notifyUser(hapticType: .notification) { ... }
+```
+
+`notifyUser(...)` is the background smart alarm alert / haptic path. The manager also updates its local state to alarming, but it does not play an additional `WKInterfaceDevice.current().play(.notification)` on this background path. Playing both can make the Watch alert feel doubled.
+
+The app should not invalidate the scheduled session inside the normal timer-completion path. A just-in-time invalidation can make watchOS treat the scheduled alarm as missed and show a system warning that the app ran in the background but could not perform the scheduled alarm.
+
+`WatchTimerManager` cancels the smart alarm session only for explicit user or rescheduling paths:
+
+- `pause`
+- `reschedule`
+- `opened app while alarming`
+
+The Debug Area includes the cancel reason:
+
+```text
+Watch smart alarm cancelled: pause
+Watch smart alarm cancelled: reschedule
+Watch smart alarm cancelled: opened app while alarming
+```
+
+This line is expected after a normal cancel:
+
+```text
+Watch smart alarm session invalidated: WKExtendedRuntimeSessionInvalidationReason(rawValue: 0)
+```
+
+`rawValue: 0` means the session ended normally. It is not an error by itself.
+
+## 21. Settings
 
 iOS Settings are defined in:
 
@@ -475,7 +528,7 @@ macOS settings are implemented in:
 20-20-20/SettingsView.swift
 ```
 
-## 21. Xcode Debug Area Notes
+## 22. Xcode Debug Area Notes
 
 Some Xcode Debug Area messages come from Apple frameworks or Simulator behavior. They do not always mean the App has a bug.
 
@@ -491,7 +544,7 @@ Some Xcode Debug Area messages come from Apple frameworks or Simulator behavior.
 
 Prioritize messages that break user-facing behavior, such as failed AlarmKit scheduling, no notification, no Watch smart alarm, or a real crash.
 
-## 22. Useful Commands
+## 23. Useful Commands
 
 Convert MP3 to CAF:
 
@@ -511,7 +564,7 @@ Build macOS from terminal:
 xcodebuild -project ~/Documents/Xcode/20-20-20/20-20-20.xcodeproj -scheme 20-20-20 -destination 'generic/platform=macOS' build
 ```
 
-## 23. Git Workflow Notes
+## 24. Git Workflow Notes
 
 This project currently keeps the local branch name as `main`, while the GitHub remote branch is `master`.
 
@@ -610,7 +663,7 @@ git push origin HEAD:master
 
 Xcode's Commit and Push UI uses Git underneath. If Xcode commits locally but GitHub does not update, check whether the local branch and remote branch names are different.
 
-## 24. Installation Notes
+## 25. Installation Notes
 
 macOS archive flow:
 
@@ -632,7 +685,7 @@ Watch development install:
 4. Select the paired Watch destination in Xcode.
 5. Run the Watch app scheme or the main app scheme with embedded Watch app.
 
-## 25. Comment Style
+## 26. Comment Style
 
 Use `//` for normal comments:
 
@@ -650,7 +703,7 @@ Use `///` for documentation comments:
 
 In Xcode, hold `Option` and click a documented symbol to see Quick Help.
 
-## 26. Future Improvements
+## 27. Future Improvements
 
 Possible future work:
 
