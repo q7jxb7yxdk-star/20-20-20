@@ -502,13 +502,13 @@ afconvert -f caff -d ima4 -c 1 input.mp3 alarm.caf
 Build iOS from terminal:
 
 ```bash
-xcodebuild -project /Users/sunnyyu/Documents/Xcode/20-20-20/20-20-20.xcodeproj -scheme 20-20-20 -destination 'generic/platform=iOS' build
+xcodebuild -project ~/Documents/Xcode/20-20-20/20-20-20.xcodeproj -scheme 20-20-20 -destination 'generic/platform=iOS' build
 ```
 
 Build macOS from terminal:
 
 ```bash
-xcodebuild -project /Users/sunnyyu/Documents/Xcode/20-20-20/20-20-20.xcodeproj -scheme 20-20-20 -destination 'generic/platform=macOS' build
+xcodebuild -project ~/Documents/Xcode/20-20-20/20-20-20.xcodeproj -scheme 20-20-20 -destination 'generic/platform=macOS' build
 ```
 
 ## 23. Git Workflow Notes

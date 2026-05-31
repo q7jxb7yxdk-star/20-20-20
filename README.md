@@ -38,7 +38,7 @@ This repository is also used as a learning project, so the Swift files include m
 Open the project in Xcode:
 
 ```text
-/Users/sunnyyu/Documents/Xcode/20-20-20/20-20-20.xcodeproj
+~/Documents/Xcode/20-20-20/20-20-20.xcodeproj
 ```
 
 Then choose a scheme:
