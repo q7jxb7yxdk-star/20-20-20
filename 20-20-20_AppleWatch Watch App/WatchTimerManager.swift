@@ -119,8 +119,8 @@ final class WatchTimerManager: NSObject, ObservableObject {
     }
     
     func nextStep() {
-        let isLastStep = currentStep == .longRest
         isAlarming = false
+        cancelSmartAlarmSession(reason: "confirm")
         
         let allSteps = WatchTimerStep.allCases
         let nextIndex = (currentStep.rawValue + 1) % allSteps.count
@@ -128,13 +128,9 @@ final class WatchTimerManager: NSObject, ObservableObject {
         selectedStep = currentStep
         shouldResetSelectedStepOnStart = false
         timeRemaining = Double(currentStep.seconds)
+        isRunning = false
+        targetDate = nil
         setRemainingSeconds(timeRemaining, for: currentStep)
-        
-        if isLastStep {
-            pause()
-        } else {
-            start()
-        }
         playTapHaptic()
     }
     

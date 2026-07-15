@@ -439,8 +439,6 @@ class TimerManager: NSObject, ObservableObject {
 
     // 前往下一階段
     func nextStep() {
-        // 先記住目前是不是最後一關，因為下面會立刻改 currentStep。
-        let isLastStep = currentStep == .longRest
         isAlarming = false
         stopScheduledAlarm()
         stopAlarmSound()
@@ -454,15 +452,15 @@ class TimerManager: NSObject, ObservableObject {
         shouldResetSelectedStepOnStart = false
         #endif
         timeRemaining = Double(currentStep.seconds)
+        isRunning = false
+        targetDate = nil
         #if os(iOS) || os(macOS)
         setRemainingSeconds(timeRemaining, for: currentStep)
         #endif
-        
-        if !isLastStep {
-            start() // 自動開始下一個循環
-        } else {
-            pause() // 到最後一個休息就停止
-        }
+        cancelScheduledAlarm()
+        #if os(iOS)
+        EyeCareLiveActivityManager.shared.end()
+        #endif
         triggerHaptic()
     }
     

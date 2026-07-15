@@ -310,9 +310,9 @@ extension ContentView {
     
     private func performPrimaryTimerAction() {
         // 同一顆主按鈕在不同狀態下做不同事：
-        // 響鈴時是「確認並進下一階段」，平常是「開始/暫停」。
+        // 響鈴時是「確認並停在下一階段」，平常是「開始/暫停」。
         if manager.displayIsAlarming {
-            manager.nextStep() // 響鈴時點一下進入下一關
+            manager.nextStep() // 響鈴時點一下進入下一關，但不自動開始倒數。
         } else {
             manager.toggle()   // 平常點一下切換暫停/開始
         }

@@ -92,6 +92,7 @@ struct WatchContentView: View {
     
     private func primaryButtonAction() {
         if manager.displayIsAlarming {
+            // Confirm the completed step and move to the next step without auto-starting it.
             manager.nextStep()
         } else {
             manager.toggle()
