@@ -13,7 +13,7 @@ This document explains how the `20-20-20` App works internally. The goal is to m
 | Step 3 | Focus work | 20 minutes |
 | Step 4 | Long rest | 3 minutes |
 
-After a step completes, the App enters an alarming state. The user confirms the alert, then the App moves to the next step. After Step 4, the cycle returns to Step 1 and waits.
+After a step completes, the App enters an alarming state. The user confirms the alert, then the App moves to the next step and waits. The next step does not start automatically.
 
 ## 2. User-Facing Features
 
@@ -221,8 +221,9 @@ When the user confirms:
 
 1. `nextStep()` stops the current alert.
 2. The next `TimerStep` is selected.
-3. If the cycle is not finished, the next step starts.
-4. If Step 4 has completed, the timer returns to Step 1 and waits.
+3. The new step's remaining time is reset to its full duration.
+4. `isRunning` stays `false` and `targetDate` stays `nil`.
+5. The user must press Start to begin the next step.
 
 ## 12. macOS Cycle Controls
 
@@ -384,7 +385,7 @@ The App only updates the Live Activity at state transitions such as start, pause
 
 The Live Activity has interactive buttons:
 
-- Start / Pause / Next
+- Start / Pause / Confirm
 - End
 
 They use:
@@ -395,6 +396,8 @@ Button(intent: ResetEyeCareLiveActivityIntent()) { ... }
 ```
 
 This lets the user control the timer without opening the App.
+
+When the Live Activity is in the alarming state, the Start / Pause / Confirm button confirms the completed step and updates the Activity to the next step in a paused state. It does not start the next countdown automatically.
 
 Because a Live Activity intent cannot directly access the active `TimerManager` instance, the App uses a command token mechanism:
 

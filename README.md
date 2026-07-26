@@ -78,13 +78,15 @@ macOS controls:
 - Click a step dot to select and display that cycle step.
 - Press `Left Arrow` / `Right Arrow` to move the selected cycle step backward / forward.
 - If another step is already counting down, it keeps running in the background while the selected step changes.
-- Press `Space` to start, pause, or confirm the completed step. Starting a different selected step replaces the currently running step.
+- Press `Space` to start, pause, or confirm the completed step. Confirming a completed step moves to the next step but does not start it automatically.
+- Starting a different selected step replaces the currently running step.
 - Press `R` to reset.
 
 iOS and watchOS controls:
 
 - Swipe left / right to select another cycle step.
 - If another step is already counting down, it keeps running while the selected step changes.
+- Confirming a completed step moves to the next step but does not start it automatically.
 - Starting a different selected step replaces the currently running step.
 
 The App UI language is stored with:
