@@ -55,7 +55,7 @@
 
 /* Begin PBXFileReference section */
 		341E0A5A4A774B0DB610988A /* 20-20-20LiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "20-20-20LiveActivityExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
-		9662EDED2FA660E600A2C2E2 /* 20-20-20.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "20-20-20.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9662EDED2FA660E600A2C2E2 /* 20-20-20-eyecare.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "20-20-20-eyecare.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		96B60C6D2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "20-20-20_AppleWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -128,7 +128,7 @@
 		9662EDEE2FA660E600A2C2E2 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				9662EDED2FA660E600A2C2E2 /* 20-20-20.app */,
+				9662EDED2FA660E600A2C2E2 /* 20-20-20-eyecare.app */,
 				96B60C6D2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App.app */,
 				341E0A5A4A774B0DB610988A /* 20-20-20LiveActivityExtension.appex */,
 			);
@@ -183,7 +183,7 @@
 			packageProductDependencies = (
 			);
 			productName = "20-20-20";
-			productReference = 9662EDED2FA660E600A2C2E2 /* 20-20-20.app */;
+			productReference = 9662EDED2FA660E600A2C2E2 /* 20-20-20-eyecare.app */;
 			productType = "com.apple.product-type.application";
 		};
 		96B60C6C2FAF357E00E0B0D5 /* 20-20-20_AppleWatch Watch App */ = {
@@ -460,6 +460,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "-0-20-20-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "20-20-20";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -477,7 +478,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sunny.eyecaretimer;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "20-20-20-eyecare";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -518,6 +519,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "-0-20-20-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "20-20-20";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -535,7 +537,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sunny.eyecaretimer;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "20-20-20-eyecare";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
