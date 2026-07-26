@@ -42,7 +42,15 @@ struct ToggleEyeCareLiveActivityIntent: LiveActivityIntent {
             
             // 先更新 Live Activity 自己的畫面，令按鈕有即時反應。
             // 同時寫入 controlCommand，讓 TimerManager 在下一個 tick 真正同步 App 內狀態。
-            await activity.update(ActivityContent(state: Self.state(newState, withCommand: "toggle"), staleDate: nil))
+            let commandState = Self.state(newState, withCommand: "toggle")
+            await activity.update(ActivityContent(state: commandState, staleDate: nil))
+            await MainActor.run {
+                NotificationCenter.default.post(
+                    name: .liveActivityControlCommandWasUpdated,
+                    object: nil,
+                    userInfo: ["state": commandState]
+                )
+            }
         }
         
         return .result()
@@ -202,6 +210,13 @@ struct ResetEyeCareLiveActivityIntent: LiveActivityIntent {
                 controlCommandID: UUID()
             )
             await activity.update(ActivityContent(state: commandState, staleDate: nil))
+            await MainActor.run {
+                NotificationCenter.default.post(
+                    name: .liveActivityControlCommandWasUpdated,
+                    object: nil,
+                    userInfo: ["state": commandState]
+                )
+            }
         }
         
         return .result()

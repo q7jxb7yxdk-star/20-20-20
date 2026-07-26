@@ -218,6 +218,13 @@ class TimerManager: NSObject, ObservableObject {
                 self?.handleDidBecomeActive()
             }
             .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: .liveActivityControlCommandWasUpdated)
+            .sink { [weak self] notification in
+                guard let state = notification.userInfo?["state"] as? EyeCareTimerLiveActivityAttributes.ContentState else { return }
+                self?.handleLiveActivityControlCommand(from: state)
+            }
+            .store(in: &cancellables)
         #endif
     }
     
@@ -500,19 +507,58 @@ class TimerManager: NSObject, ObservableObject {
             defer { isCheckingLiveActivityCommand = false }
             
             guard let state = Activity<EyeCareTimerLiveActivityAttributes>.activities.first?.content.state else { return }
-            guard let command = state.controlCommand, let commandID = state.controlCommandID else { return }
-            guard commandID != lastHandledLiveActivityCommandID else { return }
-            
-            lastHandledLiveActivityCommandID = commandID
-            
-            switch command {
-            case "toggle":
-                toggleOrAdvanceFromLiveActivity()
-            case "reset":
-                reset()
-            default:
-                break
+            handleLiveActivityControlCommand(from: state)
+        }
+    }
+    
+    private func handleLiveActivityControlCommand(from state: EyeCareTimerLiveActivityAttributes.ContentState) {
+        guard let command = state.controlCommand, let commandID = state.controlCommandID else { return }
+        guard commandID != lastHandledLiveActivityCommandID else { return }
+        
+        lastHandledLiveActivityCommandID = commandID
+        
+        switch command {
+        case "toggle":
+            applyLiveActivityToggleState(state)
+        case "reset":
+            reset()
+        default:
+            break
+        }
+    }
+    
+    private func applyLiveActivityToggleState(_ state: EyeCareTimerLiveActivityAttributes.ContentState) {
+        guard let step = TimerStep(rawValue: state.stepIndex) else {
+            toggleOrAdvanceFromLiveActivity()
+            return
+        }
+        
+        let wasAlarming = isAlarming
+        selectedStep = step
+        currentStep = step
+        shouldResetSelectedStepOnStart = false
+        isAlarming = state.isAlarming
+        isRunning = state.isRunning
+        timeRemaining = max(0, state.remainingSeconds)
+        setRemainingSeconds(timeRemaining, for: step)
+        
+        if state.isRunning {
+            let remainingSeconds = max(1, state.endDate.timeIntervalSinceNow)
+            timeRemaining = remainingSeconds
+            setRemainingSeconds(remainingSeconds, for: step)
+            targetDate = Date().addingTimeInterval(remainingSeconds)
+            let token = UUID()
+            alarmSchedulingToken = token
+            startOrUpdateLiveActivity()
+            Task { await scheduleAlarmKitTimer(expectedToken: token) }
+        } else {
+            targetDate = nil
+            if wasAlarming {
+                stopScheduledAlarm()
+            } else {
+                cancelScheduledAlarm()
             }
+            startOrUpdateLiveActivity(isRunning: false)
         }
     }
     
@@ -609,7 +655,18 @@ class TimerManager: NSObject, ObservableObject {
         let id = Alarm.ID()
         // 至少 1 秒後才觸發，避免系統不接受 0 秒或負數排程。
         let fireDate = Date().addingTimeInterval(max(1, timeRemaining))
-        let alert = AlarmPresentation.Alert(title: LocalizedStringResource(stringLiteral: AppText.notificationTitle))
+        let alertTitle = LocalizedStringResource(stringLiteral: AppText.notificationTitle)
+        let alert: AlarmPresentation.Alert
+        if #available(iOS 26.1, *) {
+            alert = AlarmPresentation.Alert(title: alertTitle)
+        } else {
+            let stopButton = AlarmButton(
+                text: LocalizedStringResource(stringLiteral: AppText.stopEyeCareReminder),
+                textColor: .white,
+                systemImageName: "stop.fill"
+            )
+            alert = AlarmPresentation.Alert(title: alertTitle, stopButton: stopButton)
+        }
         // attributes 定義系統鬧鐘畫面上要呈現的文字、顏色與自訂資料。
         let attributes = AlarmAttributes<EyeCareAlarmMetadata>(
             presentation: AlarmPresentation(alert: alert),
@@ -846,3 +903,9 @@ class TimerManager: NSObject, ObservableObject {
         }
     }
 }
+
+#if os(iOS)
+extension Notification.Name {
+    static let liveActivityControlCommandWasUpdated = Notification.Name("liveActivityControlCommandWasUpdated")
+}
+#endif

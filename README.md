@@ -165,6 +165,8 @@ Use `git add -A` only when you have checked `git status` and really want to incl
 - Live Activity behavior should be verified on a real iPhone because Simulator Lock Screen / SpringBoard behavior can differ from real devices.
 - Live Activity uses the system timer renderer for running countdowns so active and inactive Lock Screen states stay in sync.
 - Running Live Activity state is not pushed every second; the widget receives an end date and lets the system render the countdown.
+- Live Activity buttons update the Activity state and notify the running App process immediately, so Lock Screen start / pause / confirm actions stay synchronized with the in-app timer when the App is active.
+- AlarmKit alert presentation uses the iOS 26.1 initializer when available and falls back to the iOS 26.0 initializer with an explicit stop button for older deployment targets.
 - Dynamic Island compact layout uses separate icon and time sizing values; its width is controlled indirectly by the rendered content, not by a direct Dynamic Island width setting.
 - watchOS background alerts use `WKExtendedRuntimeSession` and the system `notifyUser(...)` alert / haptic. The Watch app avoids playing an additional manual notification haptic on that background path so the alert does not sound doubled.
 - `Watch smart alarm session invalidated: WKExtendedRuntimeSessionInvalidationReason(rawValue: 0)` means the Watch smart alarm session ended normally, usually after the app cancelled it because the user paused, rescheduled, or opened the app while alarming.

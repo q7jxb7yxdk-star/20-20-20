@@ -15,7 +15,7 @@ struct ToggleEyeCareLiveActivityIntent: LiveActivityIntent {
         "Start / Pause"
     }
     nonisolated static var description: IntentDescription {
-        "Start, pause, or advance the current 20-20-20 timer step."
+        "Start, pause, or confirm the current 20-20-20 timer step."
     }
     nonisolated static let openAppWhenRun = false
     
@@ -27,8 +27,8 @@ struct ToggleEyeCareLiveActivityIntent: LiveActivityIntent {
             let newState: EyeCareTimerLiveActivityAttributes.ContentState
             
             if state.isAlarming {
-                // 時間到之後，按下 play 代表「確認並開始下一階段」。
-                newState = Self.nextRunningState(from: state)
+                // 時間到之後，按下 play 代表「確認並停在下一階段」。
+                newState = Self.nextPausedState(from: state)
             } else if state.isRunning {
                 // 正在倒數時，按下 pause 代表暫停。
                 newState = Self.pausedState(from: state)
@@ -81,7 +81,7 @@ struct ToggleEyeCareLiveActivityIntent: LiveActivityIntent {
         )
     }
     
-    private static func nextRunningState(from state: EyeCareTimerLiveActivityAttributes.ContentState) -> EyeCareTimerLiveActivityAttributes.ContentState {
+    private static func nextPausedState(from state: EyeCareTimerLiveActivityAttributes.ContentState) -> EyeCareTimerLiveActivityAttributes.ContentState {
         let nextStepIndex = (state.stepIndex + 1) % Self.stepCount
         let duration = Self.duration(for: nextStepIndex, isDebugMode: state.isDebugMode)
         let endDate = Date().addingTimeInterval(duration)
@@ -90,10 +90,10 @@ struct ToggleEyeCareLiveActivityIntent: LiveActivityIntent {
             stepName: Self.stepName(for: nextStepIndex),
             stepIndex: nextStepIndex,
             themeName: Self.themeName(for: nextStepIndex),
-            startDate: Date(),
+            startDate: endDate.addingTimeInterval(-duration),
             endDate: endDate,
             remainingSeconds: duration,
-            isRunning: true,
+            isRunning: false,
             isAlarming: false,
             isDebugMode: state.isDebugMode,
             controlCommand: state.controlCommand,

@@ -292,6 +292,13 @@ AlarmKit handles system-level timer alert behavior on iOS. It is closer to the s
 
 The stop intent uses a static English metadata title because AppIntents metadata extraction requires literal strings. Runtime App UI text still uses `AppText`.
 
+`AlarmPresentation.Alert(title:)` is only available on iOS 26.1 and newer. The App checks availability before creating the alert:
+
+- iOS 26.1 and newer: use `AlarmPresentation.Alert(title:)`.
+- iOS 26.0: use the older `AlarmPresentation.Alert(title:stopButton:)` initializer with an explicit stop button.
+
+This keeps the App compatible with the current deployment target while still using the newer API where it is available.
+
 ## 16. Notifications
 
 `NotificationPresenter.swift` implements `UNUserNotificationCenterDelegate`.
@@ -403,9 +410,10 @@ Because a Live Activity intent cannot directly access the active `TimerManager` 
 
 1. Button intent updates the Activity state.
 2. It writes `controlCommand` and `controlCommandID`.
-3. `TimerManager` polls the current Activity state.
-4. If it sees a new command ID, it performs the command.
-5. Already-handled command IDs are ignored.
+3. When the App process is active, the App-target intent posts `.liveActivityControlCommandWasUpdated` with the updated Activity state so `TimerManager` can react immediately.
+4. `TimerManager` also polls the current Activity state as a fallback.
+5. If it sees a new command ID, it performs the command.
+6. Already-handled command IDs are ignored.
 
 This avoids requiring App Groups for this feature.
 
