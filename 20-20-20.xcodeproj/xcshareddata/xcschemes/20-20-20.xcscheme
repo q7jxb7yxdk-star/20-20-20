@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "9662EDEC2FA660E600A2C2E2"
-               BuildableName = "20-20-20.app"
+               BuildableName = "20-20-20-eyecare.app"
                BlueprintName = "20-20-20"
                ReferencedContainer = "container:20-20-20.xcodeproj">
             </BuildableReference>
@@ -46,7 +46,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9662EDEC2FA660E600A2C2E2"
-            BuildableName = "20-20-20.app"
+            BuildableName = "20-20-20-eyecare.app"
             BlueprintName = "20-20-20"
             ReferencedContainer = "container:20-20-20.xcodeproj">
          </BuildableReference>
@@ -70,7 +70,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9662EDEC2FA660E600A2C2E2"
-            BuildableName = "20-20-20.app"
+            BuildableName = "20-20-20-eyecare.app"
             BlueprintName = "20-20-20"
             ReferencedContainer = "container:20-20-20.xcodeproj">
          </BuildableReference>
